@@ -139,6 +139,17 @@ commTotal[(sticky(comm), nr)] += delta   // never evicted
   without counting a reset.
 - **Cap:** above `MaxProcesses` (default 4096), exited processes are evicted
   first, then the least recently active (`O(n log n)`, only when over the cap).
+  A live process evicted this way still has its series in the kernel maps,
+  so it leaves a tombstone of its `last` readings for one snapshot. If the
+  tgid is in the next snapshot, its new series difference against the
+  tombstone rather than zero, and the comm totals receive only the activity
+  since the eviction. If it is not, the process exited and the tombstone is
+  dropped. Without this, every interval would credit the evicted process's
+  whole cumulative history to its comm again. Per-pid series (`-prom-labels
+  pid`) and the top view restart from zero for such a process, which
+  Prometheus reads as a counter reset. `TestCommTotalsExactUnderEvictionProperty`
+  checks the comm totals against a kernel model over 400 snapshots with the
+  cap at 3 of 10 processes.
 - **Sliding window:** a ring of `W` slots indexed by `seq mod W`, each tagged
   with its seq. `put` is O(Slots); a windowed histogram is the sum of slots
   whose tag lies in `(cur-W, cur]`, O(W × Slots), computed only when a view
