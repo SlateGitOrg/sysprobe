@@ -35,7 +35,7 @@ struct {
 } runq_hist SEC(".maps");
 
 DEFINE_STATS_MAP()
-DEFINE_EXIT_TRACKING()
+DEFINE_PROCESS_TRACKING()
 
 static const struct hist zero_hist;
 

@@ -13,6 +13,11 @@ import (
 	"github.com/cilium/ebpf"
 )
 
+type runqCommVal struct {
+	_    structs.HostLayout
+	Comm [16]int8
+}
+
 type runqHist struct {
 	_     structs.HostLayout
 	Slots [36]uint64
@@ -25,10 +30,12 @@ type runqHist struct {
 //
 // Used for safe lookups in a Collection or CollectionSpec.
 const (
+	runqMapExecComm          = "exec_comm"
 	runqMapExited            = "exited"
 	runqMapRunqHist          = "runq_hist"
 	runqMapRunqStart         = "runq_start"
 	runqMapStats             = "stats"
+	runqProgSchedProcessExec = "sched_process_exec"
 	runqProgSchedProcessExit = "sched_process_exit"
 	runqProgSchedSwitch      = "sched_switch"
 	runqProgSchedWakeup      = "sched_wakeup"
@@ -79,6 +86,7 @@ type runqSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type runqProgramSpecs struct {
+	SchedProcessExec *ebpf.ProgramSpec `ebpf:"sched_process_exec"`
 	SchedProcessExit *ebpf.ProgramSpec `ebpf:"sched_process_exit"`
 	SchedSwitch      *ebpf.ProgramSpec `ebpf:"sched_switch"`
 	SchedWakeup      *ebpf.ProgramSpec `ebpf:"sched_wakeup"`
@@ -89,6 +97,7 @@ type runqProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type runqMapSpecs struct {
+	ExecComm  *ebpf.MapSpec `ebpf:"exec_comm"`
 	Exited    *ebpf.MapSpec `ebpf:"exited"`
 	RunqHist  *ebpf.MapSpec `ebpf:"runq_hist"`
 	RunqStart *ebpf.MapSpec `ebpf:"runq_start"`
@@ -123,6 +132,7 @@ func (o *runqObjects) Close() error {
 //
 // It can be passed to loadRunqObjects or ebpf.CollectionSpec.LoadAndAssign.
 type runqMaps struct {
+	ExecComm  *ebpf.Map `ebpf:"exec_comm"`
 	Exited    *ebpf.Map `ebpf:"exited"`
 	RunqHist  *ebpf.Map `ebpf:"runq_hist"`
 	RunqStart *ebpf.Map `ebpf:"runq_start"`
@@ -131,6 +141,7 @@ type runqMaps struct {
 
 func (m *runqMaps) Close() error {
 	return _RunqClose(
+		m.ExecComm,
 		m.Exited,
 		m.RunqHist,
 		m.RunqStart,
@@ -150,6 +161,7 @@ type runqVariables struct {
 //
 // It can be passed to loadRunqObjects or ebpf.CollectionSpec.LoadAndAssign.
 type runqPrograms struct {
+	SchedProcessExec *ebpf.Program `ebpf:"sched_process_exec"`
 	SchedProcessExit *ebpf.Program `ebpf:"sched_process_exit"`
 	SchedSwitch      *ebpf.Program `ebpf:"sched_switch"`
 	SchedWakeup      *ebpf.Program `ebpf:"sched_wakeup"`
@@ -158,6 +170,7 @@ type runqPrograms struct {
 
 func (p *runqPrograms) Close() error {
 	return _RunqClose(
+		p.SchedProcessExec,
 		p.SchedProcessExit,
 		p.SchedSwitch,
 		p.SchedWakeup,

@@ -13,6 +13,11 @@ import (
 	"github.com/cilium/ebpf"
 )
 
+type syscallsCommVal struct {
+	_    structs.HostLayout
+	Comm [16]int8
+}
+
 type syscallsHist struct {
 	_     structs.HostLayout
 	Slots [36]uint64
@@ -37,10 +42,12 @@ type syscallsSyscallKey struct {
 //
 // Used for safe lookups in a Collection or CollectionSpec.
 const (
+	syscallsMapExecComm          = "exec_comm"
 	syscallsMapExited            = "exited"
 	syscallsMapStats             = "stats"
 	syscallsMapSysHist           = "sys_hist"
 	syscallsMapSysStart          = "sys_start"
+	syscallsProgSchedProcessExec = "sched_process_exec"
 	syscallsProgSchedProcessExit = "sched_process_exit"
 	syscallsProgSysEnter         = "sys_enter"
 	syscallsProgSysExit          = "sys_exit"
@@ -90,6 +97,7 @@ type syscallsSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type syscallsProgramSpecs struct {
+	SchedProcessExec *ebpf.ProgramSpec `ebpf:"sched_process_exec"`
 	SchedProcessExit *ebpf.ProgramSpec `ebpf:"sched_process_exit"`
 	SysEnter         *ebpf.ProgramSpec `ebpf:"sys_enter"`
 	SysExit          *ebpf.ProgramSpec `ebpf:"sys_exit"`
@@ -99,6 +107,7 @@ type syscallsProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type syscallsMapSpecs struct {
+	ExecComm *ebpf.MapSpec `ebpf:"exec_comm"`
 	Exited   *ebpf.MapSpec `ebpf:"exited"`
 	Stats    *ebpf.MapSpec `ebpf:"stats"`
 	SysHist  *ebpf.MapSpec `ebpf:"sys_hist"`
@@ -133,6 +142,7 @@ func (o *syscallsObjects) Close() error {
 //
 // It can be passed to loadSyscallsObjects or ebpf.CollectionSpec.LoadAndAssign.
 type syscallsMaps struct {
+	ExecComm *ebpf.Map `ebpf:"exec_comm"`
 	Exited   *ebpf.Map `ebpf:"exited"`
 	Stats    *ebpf.Map `ebpf:"stats"`
 	SysHist  *ebpf.Map `ebpf:"sys_hist"`
@@ -141,6 +151,7 @@ type syscallsMaps struct {
 
 func (m *syscallsMaps) Close() error {
 	return _SyscallsClose(
+		m.ExecComm,
 		m.Exited,
 		m.Stats,
 		m.SysHist,
@@ -160,6 +171,7 @@ type syscallsVariables struct {
 //
 // It can be passed to loadSyscallsObjects or ebpf.CollectionSpec.LoadAndAssign.
 type syscallsPrograms struct {
+	SchedProcessExec *ebpf.Program `ebpf:"sched_process_exec"`
 	SchedProcessExit *ebpf.Program `ebpf:"sched_process_exit"`
 	SysEnter         *ebpf.Program `ebpf:"sys_enter"`
 	SysExit          *ebpf.Program `ebpf:"sys_exit"`
@@ -167,6 +179,7 @@ type syscallsPrograms struct {
 
 func (p *syscallsPrograms) Close() error {
 	return _SyscallsClose(
+		p.SchedProcessExec,
 		p.SchedProcessExit,
 		p.SysEnter,
 		p.SysExit,

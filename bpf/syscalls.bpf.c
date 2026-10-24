@@ -41,7 +41,7 @@ struct {
 } sys_hist SEC(".maps");
 
 DEFINE_STATS_MAP()
-DEFINE_EXIT_TRACKING()
+DEFINE_PROCESS_TRACKING()
 
 /* Zero value used to create histogram entries without a 320-byte stack copy. */
 static const struct hist zero_hist;

@@ -52,7 +52,7 @@ struct tcp_event {
 
 /* Index into each object's per-CPU "stats" array. */
 #define STAT_MISSED_START 0 /* exit/switch seen without a matching start */
-#define STAT_HIST_FULL 1    /* histogram map had no room for a new key */
+#define STAT_HIST_FULL 1    /* new histogram key not inserted (map full or allocator empty) */
 #define STAT_RINGBUF_FULL 2 /* ring buffer reservation failed */
 #define STAT_START_FULL 3   /* start-timestamp map update failed */
 #define STAT_MAX 4
@@ -103,19 +103,34 @@ static __always_inline void hist_record(struct hist *h, __u64 delta_ns)
 }
 
 /*
- * Process-exit tracking. When a thread-group leader exits, its tgid is put
- * into the "exited" map; userspace takes a final reading of that process's
- * histograms and then deletes them. Doing this from the exit tracepoint
- * (rather than scanning /proc) is independent of the PID namespace sysprobe
- * itself runs in.
+ * Process lifecycle tracking, shared by the histogram collectors.
+ *
+ * exit: when a thread-group leader exits, its tgid goes into "exited";
+ * userspace takes a final reading of that process's histograms and then
+ * deletes them. Doing this from the exit tracepoint (rather than scanning
+ * /proc) is independent of the PID namespace sysprobe itself runs in.
+ *
+ * exec: a histogram key records the comm of the thread that created it, so
+ * keys created between fork and exec carry the parent's name. On exec the
+ * new comm is stored in "exec_comm" and userspace relabels the process.
  */
-#define DEFINE_EXIT_TRACKING()                                           \
+struct comm_val {
+	char comm[TASK_COMM_LEN];
+};
+
+#define DEFINE_PROCESS_TRACKING()                                        \
 	struct {                                                         \
 		__uint(type, BPF_MAP_TYPE_HASH);                         \
 		__uint(max_entries, 16384);                              \
 		__type(key, __u32);   /* tgid */                         \
 		__type(value, __u64); /* exit time, ns */                \
 	} exited SEC(".maps");                                           \
+	struct {                                                         \
+		__uint(type, BPF_MAP_TYPE_HASH);                         \
+		__uint(max_entries, 16384);                              \
+		__type(key, __u32); /* tgid */                           \
+		__type(value, struct comm_val);                          \
+	} exec_comm SEC(".maps");                                        \
 	SEC("tracepoint/sched/sched_process_exit")                       \
 	int sched_process_exit(void *ctx)                                \
 	{                                                                \
@@ -126,6 +141,15 @@ static __always_inline void hist_record(struct hist *h, __u64 delta_ns)
 			return 0; /* not the group leader */             \
 		ts = bpf_ktime_get_ns();                                 \
 		bpf_map_update_elem(&exited, &tgid, &ts, BPF_ANY);       \
+		return 0;                                                \
+	}                                                                \
+	SEC("tracepoint/sched/sched_process_exec")                       \
+	int sched_process_exec(void *ctx)                                \
+	{                                                                \
+		__u32 tgid = bpf_get_current_pid_tgid() >> 32;           \
+		struct comm_val v = {};                                  \
+		bpf_get_current_comm(v.comm, sizeof(v.comm));            \
+		bpf_map_update_elem(&exec_comm, &tgid, &v, BPF_ANY);     \
 		return 0;                                                \
 	}
 
