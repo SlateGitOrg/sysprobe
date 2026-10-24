@@ -174,7 +174,7 @@ event fires, shown as `127.0.0.1:*` in the event list).
 | Same assertions, offline, on the committed recording | PASS, plus 8 mutated expectations that must each be rejected | `go test ./integration/` |
 | Probe overhead per syscall, syscalls collector | +191.4 ns (158.99 → 350.38 ns per `getppid()`, median of 7×2M calls) | `make integration`, last lines of the transcript |
 | Probe overhead per syscall, all collectors | +193.1 ns (158.99 → 352.07 ns) | same |
-| Core-logic test coverage | 97.5% of statements across the 12 core packages | `make cover` |
+| Core-logic test coverage | 97.3% of statements across the 12 core packages | `make cover` |
 | Aggregator ingest | 372 µs per snapshot of 2,000 series (≈186 ns/series), 5 allocs | `make bench` (`BenchmarkIngest`, macOS arm64 dev machine) |
 | Top view build | 0.96 ms for 100 processes × 20 syscalls × 10-snapshot window | `make bench` (`BenchmarkView`) |
 | Quantile from a log2 histogram | 36 ns, 0 allocs | `make bench` (`BenchmarkQuantile`) |
