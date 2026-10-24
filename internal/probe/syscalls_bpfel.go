@@ -42,8 +42,8 @@ type syscallsSyscallKey struct {
 //
 // Used for safe lookups in a Collection or CollectionSpec.
 const (
-	syscallsMapExecComm          = "exec_comm"
 	syscallsMapExited            = "exited"
+	syscallsMapProcComm          = "proc_comm"
 	syscallsMapStats             = "stats"
 	syscallsMapSysHist           = "sys_hist"
 	syscallsMapSysStart          = "sys_start"
@@ -107,8 +107,8 @@ type syscallsProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type syscallsMapSpecs struct {
-	ExecComm *ebpf.MapSpec `ebpf:"exec_comm"`
 	Exited   *ebpf.MapSpec `ebpf:"exited"`
+	ProcComm *ebpf.MapSpec `ebpf:"proc_comm"`
 	Stats    *ebpf.MapSpec `ebpf:"stats"`
 	SysHist  *ebpf.MapSpec `ebpf:"sys_hist"`
 	SysStart *ebpf.MapSpec `ebpf:"sys_start"`
@@ -142,8 +142,8 @@ func (o *syscallsObjects) Close() error {
 //
 // It can be passed to loadSyscallsObjects or ebpf.CollectionSpec.LoadAndAssign.
 type syscallsMaps struct {
-	ExecComm *ebpf.Map `ebpf:"exec_comm"`
 	Exited   *ebpf.Map `ebpf:"exited"`
+	ProcComm *ebpf.Map `ebpf:"proc_comm"`
 	Stats    *ebpf.Map `ebpf:"stats"`
 	SysHist  *ebpf.Map `ebpf:"sys_hist"`
 	SysStart *ebpf.Map `ebpf:"sys_start"`
@@ -151,8 +151,8 @@ type syscallsMaps struct {
 
 func (m *syscallsMaps) Close() error {
 	return _SyscallsClose(
-		m.ExecComm,
 		m.Exited,
+		m.ProcComm,
 		m.Stats,
 		m.SysHist,
 		m.SysStart,

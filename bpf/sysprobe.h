@@ -110,9 +110,11 @@ static __always_inline void hist_record(struct hist *h, __u64 delta_ns)
  * deletes them. Doing this from the exit tracepoint (rather than scanning
  * /proc) is independent of the PID namespace sysprobe itself runs in.
  *
- * exec: a histogram key records the comm of the thread that created it, so
- * keys created between fork and exec carry the parent's name. On exec the
- * new comm is stored in "exec_comm" and userspace relabels the process.
+ * naming: a histogram key records the comm of the thread that created it,
+ * which may be a worker thread ("ghc_ticker") or, between fork and exec, the
+ * parent's name. "proc_comm" holds the authoritative process name: written
+ * on exec and whenever the group leader itself creates a key. Userspace
+ * prefers it over the per-key comm.
  */
 struct comm_val {
 	char comm[TASK_COMM_LEN];
@@ -130,7 +132,7 @@ struct comm_val {
 		__uint(max_entries, 16384);                              \
 		__type(key, __u32); /* tgid */                           \
 		__type(value, struct comm_val);                          \
-	} exec_comm SEC(".maps");                                        \
+	} proc_comm SEC(".maps");                                        \
 	SEC("raw_tracepoint/sched_process_exit")                         \
 	int sched_process_exit(void *ctx)                                \
 	{                                                                \
@@ -149,8 +151,16 @@ struct comm_val {
 		__u32 tgid = bpf_get_current_pid_tgid() >> 32;           \
 		struct comm_val v = {};                                  \
 		bpf_get_current_comm(v.comm, sizeof(v.comm));            \
-		bpf_map_update_elem(&exec_comm, &tgid, &v, BPF_ANY);     \
+		bpf_map_update_elem(&proc_comm, &tgid, &v, BPF_ANY);     \
 		return 0;                                                \
+	}                                                                \
+	/* Called when the group leader creates a histogram key. */      \
+	static __always_inline void note_leader_comm(__u32 tgid,         \
+						     const char *comm)   \
+	{                                                                \
+		struct comm_val v = {};                                  \
+		__builtin_memcpy(v.comm, comm, sizeof(v.comm));          \
+		bpf_map_update_elem(&proc_comm, &tgid, &v, BPF_ANY);     \
 	}
 
 #endif /* SYSPROBE_H */

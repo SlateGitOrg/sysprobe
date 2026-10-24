@@ -117,10 +117,11 @@ func (h *Log2) Mean() float64 {
 // the bucket holding the rank and interpolating linearly inside it. The
 // estimate always lies in the same bucket as the true quantile, so the
 // relative error is bounded by the bucket width (a factor of two). The
-// open-ended last bucket reports its lower bound. Returns 0 when empty.
+// open-ended last bucket reports its lower bound. Returns 0 when empty or
+// when q is NaN.
 func (h *Log2) Quantile(q float64) float64 {
 	total := h.Total()
-	if total == 0 {
+	if total == 0 || math.IsNaN(q) {
 		return 0
 	}
 	if q < 0 {

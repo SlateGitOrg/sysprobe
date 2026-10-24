@@ -30,8 +30,8 @@ type runqHist struct {
 //
 // Used for safe lookups in a Collection or CollectionSpec.
 const (
-	runqMapExecComm          = "exec_comm"
 	runqMapExited            = "exited"
+	runqMapProcComm          = "proc_comm"
 	runqMapRunqHist          = "runq_hist"
 	runqMapRunqStart         = "runq_start"
 	runqMapStats             = "stats"
@@ -97,8 +97,8 @@ type runqProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type runqMapSpecs struct {
-	ExecComm  *ebpf.MapSpec `ebpf:"exec_comm"`
 	Exited    *ebpf.MapSpec `ebpf:"exited"`
+	ProcComm  *ebpf.MapSpec `ebpf:"proc_comm"`
 	RunqHist  *ebpf.MapSpec `ebpf:"runq_hist"`
 	RunqStart *ebpf.MapSpec `ebpf:"runq_start"`
 	Stats     *ebpf.MapSpec `ebpf:"stats"`
@@ -132,8 +132,8 @@ func (o *runqObjects) Close() error {
 //
 // It can be passed to loadRunqObjects or ebpf.CollectionSpec.LoadAndAssign.
 type runqMaps struct {
-	ExecComm  *ebpf.Map `ebpf:"exec_comm"`
 	Exited    *ebpf.Map `ebpf:"exited"`
+	ProcComm  *ebpf.Map `ebpf:"proc_comm"`
 	RunqHist  *ebpf.Map `ebpf:"runq_hist"`
 	RunqStart *ebpf.Map `ebpf:"runq_start"`
 	Stats     *ebpf.Map `ebpf:"stats"`
@@ -141,8 +141,8 @@ type runqMaps struct {
 
 func (m *runqMaps) Close() error {
 	return _RunqClose(
-		m.ExecComm,
 		m.Exited,
+		m.ProcComm,
 		m.RunqHist,
 		m.RunqStart,
 		m.Stats,

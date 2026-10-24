@@ -48,7 +48,7 @@ type histSource struct {
 	name     string
 	hist     *ebpf.Map
 	exited   *ebpf.Map
-	execComm *ebpf.Map
+	procComm *ebpf.Map
 	stats    *ebpf.Map
 }
 
@@ -188,7 +188,7 @@ func (p *Probe) openSyscalls(self uint32) error {
 			return err
 		}
 	}
-	p.sys = &histSource{name: CollectorSyscalls, hist: objs.SysHist, exited: objs.Exited, execComm: objs.ExecComm, stats: objs.Stats}
+	p.sys = &histSource{name: CollectorSyscalls, hist: objs.SysHist, exited: objs.Exited, procComm: objs.ProcComm, stats: objs.Stats}
 	return nil
 }
 
@@ -223,7 +223,7 @@ func (p *Probe) openRunq(self uint32) error {
 	if err := p.attachRaw("sched_process_exec", objs.SchedProcessExec); err != nil {
 		return err
 	}
-	p.runq = &histSource{name: CollectorRunq, hist: objs.RunqHist, exited: objs.Exited, execComm: objs.ExecComm, stats: objs.Stats}
+	p.runq = &histSource{name: CollectorRunq, hist: objs.RunqHist, exited: objs.Exited, procComm: objs.ProcComm, stats: objs.Stats}
 	return nil
 }
 
@@ -368,13 +368,16 @@ func (p *Probe) collect() (*events.Snapshot, error) {
 	return s, nil
 }
 
-// readHist iterates a per-CPU histogram map. Runq keys are a bare tgid;
-// syscall keys are (tgid, nr).
+// readHist iterates a per-CPU histogram map and names every sample after
+// its process (see nameProcesses). Runq keys are a bare tgid; syscall keys
+// are (tgid, nr).
 func (p *Probe) readHist(src *histSource, fn func(key []byte, s events.SyscallSample)) error {
-	comms, err := execComms(src.execComm)
+	comms, err := procComms(src.procComm)
 	if err != nil {
 		return err
 	}
+	var keys [][]byte
+	var samples []events.SyscallSample
 	var key []byte
 	var perCPU [][]byte
 	it := src.hist.Iterate()
@@ -396,14 +399,16 @@ func (p *Probe) readHist(src *histSource, fn func(key []byte, s events.SyscallSa
 			}
 			sample.TGID, sample.NR = tgid, nr
 		}
-		if c, ok := comms[sample.TGID]; ok {
-			comm = c // the process exec'd: keys created before exec carry the old name
-		}
 		sample.Comm, sample.Hist = comm, h
-		fn(append([]byte(nil), key...), sample)
+		keys = append(keys, append([]byte(nil), key...))
+		samples = append(samples, sample)
 	}
 	if err := it.Err(); err != nil {
 		return fmt.Errorf("iterate %s map: %w", src.name, err)
+	}
+	events.NameProcesses(samples, comms)
+	for i := range samples {
+		fn(keys[i], samples[i])
 	}
 	return nil
 }
@@ -412,7 +417,7 @@ func le32(b []byte) uint32 {
 	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24
 }
 
-func execComms(m *ebpf.Map) (map[uint32]string, error) {
+func procComms(m *ebpf.Map) (map[uint32]string, error) {
 	out := map[uint32]string{}
 	var tgid uint32
 	var comm []byte
@@ -421,7 +426,7 @@ func execComms(m *ebpf.Map) (map[uint32]string, error) {
 		out[tgid] = events.Comm(comm)
 	}
 	if err := it.Err(); err != nil {
-		return nil, fmt.Errorf("iterate exec_comm map: %w", err)
+		return nil, fmt.Errorf("iterate proc_comm map: %w", err)
 	}
 	return out, nil
 }
@@ -452,8 +457,8 @@ func (p *Probe) gc(src *histSource, dead [][]byte, exited map[uint32]struct{}) {
 		if err := src.exited.Delete(tgid); err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
 			p.cfg.Logger.Debug("gc exited delete", "collector", src.name, "err", err)
 		}
-		if err := src.execComm.Delete(tgid); err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
-			p.cfg.Logger.Debug("gc exec_comm delete", "collector", src.name, "err", err)
+		if err := src.procComm.Delete(tgid); err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
+			p.cfg.Logger.Debug("gc proc_comm delete", "collector", src.name, "err", err)
 		}
 	}
 }

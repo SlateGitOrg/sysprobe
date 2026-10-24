@@ -118,8 +118,11 @@ int sys_exit(struct bpf_raw_tracepoint_args *ctx)
 			return 0;
 		}
 	}
-	if (!h->comm[0])
+	if (!h->comm[0]) {
 		bpf_get_current_comm(h->comm, sizeof(h->comm));
+		if (tid == key.tgid)
+			note_leader_comm(key.tgid, h->comm);
+	}
 	hist_record(h, delta);
 	return 0;
 }

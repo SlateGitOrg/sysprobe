@@ -112,8 +112,11 @@ int BPF_PROG(sched_switch, _Bool preempt, struct task_struct *prev, struct task_
 			return 0;
 		}
 	}
-	if (!h->comm[0])
+	if (!h->comm[0]) {
 		BPF_CORE_READ_STR_INTO(&h->comm, next, comm);
+		if (tid == tgid)
+			note_leader_comm(tgid, h->comm);
+	}
 	hist_record(h, delta);
 	return 0;
 }
