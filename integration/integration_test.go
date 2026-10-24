@@ -35,8 +35,9 @@ func loadgen(t *testing.T, bin string, args ...string) []byte {
 }
 
 type rawCapture struct {
-	mu   sync.Mutex
-	tcp  [][]byte
+	mu     sync.Mutex
+	tcp    [][]byte
+	byKind map[events.TCPKind]int
 	hist map[string][][]byte // collector|keyhex -> latest per-CPU values
 }
 
@@ -83,13 +84,17 @@ func TestLiveKernel(t *testing.T) {
 		t.Fatalf("build loadgen: %v\n%s", err, out)
 	}
 
-	raw := &rawCapture{hist: map[string][][]byte{}}
+	raw := &rawCapture{hist: map[string][][]byte{}, byKind: map[events.TCPKind]int{}}
 	p, err := probe.Open(probe.Config{
 		Syscalls: true, Runq: true, TCP: true, Interval: 500 * time.Millisecond,
 		OnRawTCP: func(b []byte) {
 			raw.mu.Lock()
 			defer raw.mu.Unlock()
-			if len(raw.tcp) < 64 {
+			// Keep a bounded sample of every kind, so unrelated host traffic
+			// cannot crowd out the retransmits and failures we provoke.
+			e, err := events.DecodeTCPEvent(b)
+			if err == nil && raw.byKind[e.Kind] < 16 {
+				raw.byKind[e.Kind]++
 				raw.tcp = append(raw.tcp, append([]byte(nil), b...))
 			}
 		},

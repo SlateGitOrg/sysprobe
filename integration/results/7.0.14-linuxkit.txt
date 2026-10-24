@@ -1,7 +1,7 @@
 # sysprobe integration transcript
-date:   2026-10-24T01:19:07Z
+date:   2026-10-24T01:29:36Z
 where:  privileged container (sysprobe-builder, --pid=host) on Docker 29.8.1 Docker Desktop, VM kernel 7.0.14-linuxkit aarch64, host Darwin arm64
-uname:  Linux d9c06b56f0c6 7.0.14-linuxkit #1 SMP PREEMPT Fri Sep 18 10:19:32 UTC 2026 aarch64 GNU/Linux
+uname:  Linux bdab0fd0bc06 7.0.14-linuxkit #1 SMP PREEMPT Fri Sep 18 10:19:32 UTC 2026 aarch64 GNU/Linux
 cpus:   8
 clang:  Debian clang version 19.1.7 (3+b1)
 go:     go version go1.27.1 linux/arm64
@@ -41,7 +41,7 @@ collector tcp      READY
 
 $ SYSPROBE_RECORD_DIR=testdata go test -tags integration -count=1 -v ./integration/
 === RUN   TestLiveKernel
-    integration_test.go:75: doctor:
+    integration_test.go:76: doctor:
         kernel 7.0.14-linuxkit (7.0.14), arch aarch64
         
         collector syscalls READY
@@ -73,74 +73,76 @@ $ SYSPROBE_RECORD_DIR=testdata go test -tags integration -count=1 -v ./integrati
           [ok     ] ring buffer                          BPF_MAP_TYPE_RINGBUF
           [ok     ] tracepoint inet_sock_set_state       btf_trace_inet_sock_set_state in kernel BTF
           [ok     ] tracepoint tcp_retransmit_skb        btf_trace_tcp_retransmit_skb in kernel BTF
-    integration_test.go:170: workload: {Kernel:7.0.14-linuxkit Arch:aarch64 Where:privileged container (sysprobe-builder, --pid=host) on Docker 29.8.1 Docker Desktop, VM kernel 7.0.14-linuxkit aarch64, host Darwin arm64 SyscallPID:37888 Sleeps:1694 SleepNs:3000000 Reads:6325696 Workers:2 TCPPID:37898 OKPort:33017 ClosedPort:38627 OverflowPort:53143 ConnectsOK:20 Refused:1 TimedOut:2}
-    integration_test.go:199: kernel counter runq/hist_insert_failed = 0
-    integration_test.go:199: kernel counter runq/missed_start = 0
-    integration_test.go:199: kernel counter runq/start_full = 0
-    integration_test.go:199: kernel counter syscalls/hist_insert_failed = 0
-    integration_test.go:199: kernel counter syscalls/missed_start = 94
-    integration_test.go:199: kernel counter syscalls/start_full = 0
-    integration_test.go:199: kernel counter tcp/decode_error = 0
-    integration_test.go:199: kernel counter tcp/missed_start = 0
-    integration_test.go:199: kernel counter tcp/queue_full = 0
-    integration_test.go:199: kernel counter tcp/ringbuf_full = 0
-    integration_test.go:199: kernel counter tcp/start_full = 0
-    integration_test.go:201: snapshots 19, processes 88, tcp connects 25 fails 3 retransmits 6
-    integration_test.go:205: recorded fixtures under /src/testdata (itest-7.0.14-linuxkit.*)
---- PASS: TestLiveKernel (9.45s)
+    integration_test.go:175: workload: {Kernel:7.0.14-linuxkit Arch:aarch64 Where:privileged container (sysprobe-builder, --pid=host) on Docker 29.8.1 Docker Desktop, VM kernel 7.0.14-linuxkit aarch64, host Darwin arm64 SyscallPID:43666 Sleeps:1686 SleepNs:3000000 Reads:6164602 Workers:2 TCPPID:43734 OKPort:40345 ClosedPort:33505 OverflowPort:47995 ConnectsOK:20 Refused:1 TimedOut:2}
+    integration_test.go:204: kernel counter runq/hist_insert_failed = 1
+    integration_test.go:204: kernel counter runq/missed_start = 0
+    integration_test.go:204: kernel counter runq/start_full = 0
+    integration_test.go:204: kernel counter syscalls/hist_insert_failed = 17
+    integration_test.go:204: kernel counter syscalls/missed_start = 99
+    integration_test.go:204: kernel counter syscalls/start_full = 0
+    integration_test.go:204: kernel counter tcp/decode_error = 0
+    integration_test.go:204: kernel counter tcp/missed_start = 0
+    integration_test.go:204: kernel counter tcp/queue_full = 0
+    integration_test.go:204: kernel counter tcp/ringbuf_full = 0
+    integration_test.go:204: kernel counter tcp/start_full = 0
+    integration_test.go:206: snapshots 19, processes 100, tcp connects 25 fails 3 retransmits 6
+    integration_test.go:210: recorded fixtures under /src/testdata (itest-7.0.14-linuxkit.*)
+--- PASS: TestLiveKernel (9.52s)
 === RUN   TestRecordedFixturesMatchWorkload
---- PASS: TestRecordedFixturesMatchWorkload (0.02s)
+--- PASS: TestRecordedFixturesMatchWorkload (0.03s)
 === RUN   TestVerifyDetectsWrongExpectations
---- PASS: TestVerifyDetectsWrongExpectations (0.02s)
+--- PASS: TestVerifyDetectsWrongExpectations (0.03s)
 === RUN   TestCommTotalsCoverProcessTotals
 --- PASS: TestCommTotalsCoverProcessTotals (0.03s)
 === RUN   TestLoadExpectErrors
 --- PASS: TestLoadExpectErrors (0.00s)
 PASS
-ok  	github.com/archit2501/sysprobe/integration	9.523s
+ok  	github.com/archit2501/sysprobe/integration	9.608s
 
 $ sysprobe record -o testdata/recorded/demo-7.0.14-linuxkit.jsonl -duration 8s   (with loadgen running)
-time=2026-10-24T01:19:18.779Z level=INFO msg="collector attached" collector=syscalls
-time=2026-10-24T01:19:18.807Z level=INFO msg="collector attached" collector=runq
-time=2026-10-24T01:19:18.831Z level=INFO msg="collector attached" collector=tcp
+time=2026-10-24T01:29:47.724Z level=INFO msg="collector attached" collector=syscalls
+time=2026-10-24T01:29:47.763Z level=INFO msg="collector attached" collector=runq
+time=2026-10-24T01:29:47.789Z level=INFO msg="collector attached" collector=tcp
 sysprobe top  snapshot 9  elapsed 8.016s  window 8.016s  arch aarch64  sort busy
-processes 52  tcp connects 11  failed 3  retransmits 6  series resets 0  evicted 0
-kernel drops  runq/missed_start=1 syscalls/missed_start=73
+processes 63  tcp connects 14  failed 3  retransmits 11  series resets 0  evicted 0
+kernel drops  syscalls/missed_start=96
 
     PID COMM              SYSC/s  IN-SYS      P50      P99  TOP SYSCALL (IN-SYS)         RUNQ/s   RQ-P99  CONN
-    131 initd              141.0  547.5%   23.5us  963.0ms  futex (365.0%)                 67.9  197.7us     -
-    247 containerd         158.4  449.0%   18.8us  690.8ms  futex (356.7%)                 69.1  244.4us     -
-    267 dockerd            253.8  421.6%    6.8us  675.9ms  futex (321.7%)                 85.3  545.3us     -
-    884 ghc_worker          43.0  267.0%   10.6ms  985.5ms  futex (147.0%)                 36.3   92.9us     -
-   2566 auth                 9.6  187.4%  172.0us    4.02s  futex (124.7%)                  8.0   89.1us     -
-    743 containerd-shim     62.4  100.7%    932ns  671.1ms  futex (62.9%)                   8.9  676.3us     -
-   2535 .postgres-wrapp      1.0  100.2%  805.3ms    1.07s  epoll_pwait (100.2%)            1.0  125.8us     -
-   2527 nginx                1.1   88.1%  728.6ms    1.07s  epoll_pwait (88.1%)             1.0  251.7us     -
-    746 containerd-shim    107.2   71.8%    1.2us   63.1ms  futex (53.8%)                  20.7  351.3us     -
-  37458 containerd-shim     63.9   67.6%    718ns  615.6ms  futex (46.3%)                   7.9   27.6us     -
-    770 containerd-shim     62.0   50.9%    1.1us    1.1ms  futex (38.1%)                   8.4   43.6us     -
-   2544 containerd-shim     84.0   50.6%    656ns  433.6us  futex (37.9%)                  10.0  209.7us     -
-        ... 40 more
+    267 dockerd           1698.9  716.5%    3.1us    6.8ms  futex (617.8%)                496.5  491.2us     -
+    131 initd              579.9  684.7%    2.2us  168.4ms  futex (537.1%)                120.6    2.2ms     -
+    247 containerd        1875.9  492.0%    1.9us    2.9ms  futex (392.9%)                460.1  410.2us     -
+    746 containerd-shim    112.8  280.2%    1.3us   60.1ms  futex (210.3%)                 20.8   60.0us     -
+    884 ghc_worker          43.7  275.8%   10.7ms  988.3ms  futex (155.6%)                 36.6  221.5us     -
+   2566 auth                13.7  187.3%   88.8us    3.51s  futex (124.6%)                  9.4    2.6ms     -
+    741 containerd-shim     90.3  101.6%    490ns  587.9ms  futex (75.9%)                   9.1    1.3ms     -
+  43308 containerd-shim     62.1   97.8%    481ns  673.8ms  futex (61.5%)                   6.1  920.1us     -
+    770 containerd-shim    103.2   90.7%    790ns  317.4ms  futex (72.5%)                  15.8    2.9ms     -
+   2544 containerd-shim    105.4   88.6%    855ns  305.3ms  futex (70.8%)                  17.6  401.1us     -
+   2535 .postgres-wrapp      0.9   87.6%  805.3ms    1.07s  epoll_pwait (87.6%)             1.0  125.8us     -
+   2527 nginx                1.1   87.5%  728.6ms    1.07s  epoll_pwait (87.5%)             1.0   62.9us     -
+        ... 51 more
 
 TCP DESTINATION                            CONN   FAIL   RETX      P50      P99
-127.0.0.1:37195                              10      0      0   13.1us  124.5us
-127.0.0.1:56029                               1      2      6   32.8us   32.8us
-127.0.0.1:43699                               0      1      0        -        -
+127.0.0.1:41933                              10      0      0   10.2us  124.5us
+127.0.0.1:49965                               1      2      6   65.5us   65.5us
+127.0.0.1:34569                               0      1      0        -        -
+127.0.0.1:5000                                1      0      0  131.1us  131.1us
+127.0.0.1:5432                                1      0      0  131.1us  131.1us
 
 RECENT TCP EVENTS (newest first)
-  +2.51s     connect_fail sysprobe-loadge(37967) 127.0.0.1:0 -> 127.0.0.1:56029 3.50s
-  +2.453s    connect_fail sysprobe-loadge(37967) 127.0.0.1:0 -> 127.0.0.1:56029 3.50s
-  +2.102s    retransmit   softirq                127.0.0.1:53884 -> 127.0.0.1:56029
-  +2.048s    retransmit   softirq                127.0.0.1:53872 -> 127.0.0.1:56029
-  +1.086s    retransmit   softirq                127.0.0.1:53884 -> 127.0.0.1:56029
-  +1.016s    retransmit   softirq                127.0.0.1:53872 -> 127.0.0.1:56029
-  +64ms      retransmit   softirq                127.0.0.1:53884 -> 127.0.0.1:56029
-  +0s        retransmit   softirq                127.0.0.1:53872 -> 127.0.0.1:56029
+  +2.541s    connect_fail sysprobe-loadge(43769) 127.0.0.1:* -> 127.0.0.1:49965 3.51s
+  +2.486s    connect_fail sysprobe-loadge(43769) 127.0.0.1:* -> 127.0.0.1:49965 3.50s
+  +2.114s    retransmit   softirq                127.0.0.1:47956 -> 127.0.0.1:49965
+  +2.047s    retransmit   softirq                127.0.0.1:47942 -> 127.0.0.1:49965
+  +1.089s    retransmit   softirq                127.0.0.1:47956 -> 127.0.0.1:49965
+  +1.023s    retransmit   softirq                127.0.0.1:47942 -> 127.0.0.1:49965
+  +63ms      retransmit   softirq                127.0.0.1:47956 -> 127.0.0.1:49965
+  +0s        retransmit   softirq                127.0.0.1:47942 -> 127.0.0.1:49965
 
 # overhead: median of 7 runs of 2,000,000 getppid() calls, ns per call
-baseline (no probe)                  : 156.4546875 ns
-syscalls collector attached          : 346.732979 ns
-all collectors attached              : 346.066917 ns
-added per syscall: syscalls=190.3 ns, all=189.6 ns
+baseline (no probe)                  : 158.9866875 ns
+syscalls collector attached          : 350.378021 ns
+all collectors attached              : 352.0735625 ns
+added per syscall: syscalls=191.4 ns, all=193.1 ns
 
 integration status: PASS
