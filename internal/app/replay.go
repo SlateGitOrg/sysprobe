@@ -27,8 +27,8 @@ type ReplayOptions struct {
 	PID uint32
 	// Metrics appends the Prometheus exposition after the replay.
 	Metrics bool
-	// MetricsFilter keeps only exposition lines containing this substring
-	// (comments for kept families are kept too). Empty keeps everything.
+	// MetricsFilter keeps only exposition lines containing every
+	// comma-separated substring. Empty keeps everything.
 	MetricsFilter string
 }
 
@@ -94,13 +94,18 @@ func Replay(ctx context.Context, in io.Reader, out io.Writer, o ReplayOptions) e
 	return nil
 }
 
-func filterMetrics(text, sub string) string {
-	if sub == "" {
+func filterMetrics(text, filter string) string {
+	if filter == "" {
 		return text
 	}
+	subs := strings.Split(filter, ",")
 	var b strings.Builder
 	for _, line := range strings.SplitAfter(text, "\n") {
-		if strings.Contains(line, sub) {
+		keep := true
+		for _, sub := range subs {
+			keep = keep && strings.Contains(line, sub)
+		}
+		if keep {
 			b.WriteString(line)
 		}
 	}

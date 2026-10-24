@@ -3,13 +3,16 @@ package top
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/archit2501/sysprobe/internal/aggregate"
 	"github.com/archit2501/sysprobe/internal/hist"
 )
 
-// RenderProcess draws the per-syscall breakdown of one process and the
-// latency distribution of its busiest syscalls (at most maxHists).
+// RenderProcess draws the per-syscall breakdown of one process, over the
+// sliding window and over its whole tracked lifetime, then the latency
+// distribution of its busiest syscalls (at most maxHists). Lifetime
+// histograms are drawn when the window is empty (e.g. the process exited).
 func RenderProcess(v *aggregate.View, tgid uint32, maxHists int) (string, error) {
 	var p *aggregate.ProcessView
 	for i := range v.Processes {
@@ -26,26 +29,34 @@ func RenderProcess(v *aggregate.View, tgid uint32, maxHists int) (string, error)
 	if p.Exited {
 		state = " (exited)"
 	}
-	fmt.Fprintf(&b, "process %d %s%s  window %s\n", p.TGID, p.Comm, state, v.Window)
-	fmt.Fprintf(&b, "  syscalls %s/s  in-sys %s  p50 %s  p99 %s  runq p50 %s p99 %s  connects %d failed %d\n\n",
+	fmt.Fprintf(&b, "process %d %s%s  window %s\n", p.TGID, p.Comm, state, v.Window.Round(time.Millisecond))
+	fmt.Fprintf(&b, "  window: syscalls %s/s  in-sys %s  p50 %s  p99 %s  runq p50 %s p99 %s  connects %d failed %d\n\n",
 		rate(p.SyscallRate), pct(p.SyscallBusy), Dur(p.SyscallP50), Dur(p.SyscallP99),
 		Dur(p.RunqP50), Dur(p.RunqP99), p.Connects, p.ConnectFails)
-	fmt.Fprintf(&b, "  %-22s %10s %9s %8s %9s %9s %12s\n", "SYSCALL", "WINDOW", "RATE/s", "IN-SYS", "P50", "P99", "TOTAL")
-	shown := 0
+	fmt.Fprintf(&b, "  %-20s %9s %8s %9s %9s | %10s %9s %9s %9s\n",
+		"SYSCALL", "WIN-CALLS", "IN-SYS", "WIN-P50", "WIN-P99", "CALLS", "MEAN", "P50", "P99")
 	for _, s := range p.Syscalls {
-		if s.Count == 0 && s.Total == 0 {
+		if s.Total == 0 {
 			continue
 		}
-		fmt.Fprintf(&b, "  %-22s %10d %9s %8s %9s %9s %12d\n", trunc(s.Name, 22), s.Count, rate(s.Rate),
-			pct(s.Busy), Dur(s.P50), Dur(s.P99), s.Total)
+		th := s.TotalHist
+		fmt.Fprintf(&b, "  %-20s %9d %8s %9s %9s | %10d %9s %9s %9s\n", trunc(s.Name, 20), s.Count,
+			pct(s.Busy), Dur(s.P50), Dur(s.P99), s.Total, Dur(time.Duration(th.Mean())),
+			Dur(time.Duration(th.Quantile(0.5))), Dur(time.Duration(th.Quantile(0.99))))
 	}
-	for _, s := range p.Syscalls {
-		if shown >= maxHists || s.Count == 0 {
+	shown := 0
+	for i := range p.Syscalls {
+		s := &p.Syscalls[i]
+		if shown >= maxHists || s.Total == 0 {
 			break
 		}
 		shown++
-		fmt.Fprintf(&b, "\n  %s latency (window, %d calls)\n", s.Name, s.Count)
-		b.WriteString(Bars(&s.Hist, 40))
+		h, scope := &s.Hist, fmt.Sprintf("window, %d calls", s.Count)
+		if s.Count == 0 {
+			h, scope = &s.TotalHist, fmt.Sprintf("lifetime, %d calls", s.Total)
+		}
+		fmt.Fprintf(&b, "\n  %s latency (%s)\n", s.Name, scope)
+		b.WriteString(Bars(h, 40))
 	}
 	return b.String(), nil
 }

@@ -242,7 +242,7 @@ func cmdReplay(ctx context.Context, args []string, stdout, stderr io.Writer) err
 	frames := fs.Bool("frames", false, "render a frame after every snapshot")
 	pid := fs.Uint("pid", 0, "append the per-syscall detail of this process")
 	metrics := fs.Bool("metrics", false, "append the Prometheus exposition")
-	filter := fs.String("metrics-filter", "", "only print exposition lines containing this text")
+	filter := fs.String("metrics-filter", "", "only print exposition lines containing all of these comma-separated strings")
 	exited := fs.Bool("exited", false, "include exited processes in the table")
 	if err := fs.Parse(args); err != nil {
 		return err

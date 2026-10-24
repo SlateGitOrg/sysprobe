@@ -18,8 +18,9 @@ type SyscallView struct {
 	P50   time.Duration // window quantiles (log2 bucket interpolation)
 	P99   time.Duration
 	Total uint64 // calls since first seen
-	// Hist is the window histogram the fields above were derived from.
-	Hist hist.Log2
+	// Hist is the window histogram the fields above were derived from;
+	// TotalHist covers the process's whole tracked lifetime.
+	Hist, TotalHist hist.Log2
 }
 
 // ProcessView is one process over the sliding window.
@@ -32,7 +33,7 @@ type ProcessView struct {
 	SyscallBusy float64
 	SyscallP50  time.Duration
 	SyscallP99  time.Duration
-	// Syscalls is sorted by Busy, descending (ties by NR).
+	// Syscalls is sorted by window Busy, then lifetime time, descending.
 	Syscalls []SyscallView
 
 	RunqRate float64 // run-queue waits per second
@@ -150,13 +151,16 @@ func (a *Aggregator) processView(p *process, w time.Duration) ProcessView {
 		all.Add(&h)
 		pv.Syscalls = append(pv.Syscalls, SyscallView{
 			NR: nr, Name: a.table.Name(nr), Count: h.Count, Rate: perSec(h.Count, w),
-			Busy: busy(&h, w), P50: q(&h, 0.5), P99: q(&h, 0.99), Total: sr.total.Count, Hist: h,
+			Busy: busy(&h, w), P50: q(&h, 0.5), P99: q(&h, 0.99), Total: sr.total.Count, Hist: h, TotalHist: sr.total,
 		})
 	}
 	sort.Slice(pv.Syscalls, func(i, j int) bool {
 		si, sj := &pv.Syscalls[i], &pv.Syscalls[j]
 		if si.Busy != sj.Busy {
 			return si.Busy > sj.Busy
+		}
+		if si.TotalHist.SumNs != sj.TotalHist.SumNs {
+			return si.TotalHist.SumNs > sj.TotalHist.SumNs
 		}
 		return si.NR < sj.NR
 	})

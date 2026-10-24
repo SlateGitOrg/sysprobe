@@ -52,11 +52,18 @@ build:
 	$(GO) build -o bin/sysprobe ./cmd/sysprobe
 	GOOS=linux $(GO) build -o bin/sysprobe-linux-$$($(GO) env GOARCH) ./cmd/sysprobe
 
+# Offline: replays fixtures recorded on a real kernel by `make integration`.
+ITEST_FIXTURE := $(firstword $(wildcard testdata/recorded/itest-*.jsonl))
+ITEST_PID      = $(shell sed -n 's/.*"syscall_pid": \([0-9]*\).*/\1/p' $(ITEST_FIXTURE:.jsonl=.expect.json))
+
 demo:
-	@test -n "$(DEMO_FIXTURE)" || { echo "no testdata/recorded/demo-*.jsonl; run make integration"; exit 1; }
-	$(GO) run ./cmd/sysprobe replay -rows 10 -exited=false $(DEMO_FIXTURE)
+	@test -n "$(DEMO_FIXTURE)" -a -n "$(ITEST_FIXTURE)" || { echo "no recorded fixtures; run make integration"; exit 1; }
+	@echo "== 1. top view at the end of a live recording (sysprobe record, 8s) =="
+	@$(GO) run ./cmd/sysprobe replay -rows 10 $(DEMO_FIXTURE)
 	@echo
-	$(GO) run ./cmd/sysprobe replay -rows 0 -pid $$(sed -n 's/.*"syscall_pid": \([0-9]*\).*/\1/p' $$(ls testdata/recorded/itest-*.expect.json | head -1)) -metrics -metrics-filter 'sysprobe-loadge' $$(ls testdata/recorded/itest-*.jsonl | head -1)
+	@echo "== 2. the known workload: loadgen pid $(ITEST_PID) slept 3ms per clock_nanosleep =="
+	@$(GO) run ./cmd/sysprobe replay -rows -1 -pid $(ITEST_PID) -metrics \
+		-metrics-filter 'sysprobe-loadge,clock_nanosleep' $(ITEST_FIXTURE)
 
 bench:
 	$(GO) test -run '^$$' -bench . -benchmem ./internal/aggregate ./internal/hist ./internal/events

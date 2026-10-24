@@ -21,11 +21,11 @@ RECENT TCP EVENTS (newest first)
   +0s        connect      api(100)               10.1.0.5:41000 -> 10.1.0.9:5432 150.0us
 
 process 100 api  window 3s
-  syscalls 420.0/s  in-sys 1.9%  p50 3.1us  p99 938.5us  runq p50 24.6us p99 32.6us  connects 0 failed 0
+  window: syscalls 420.0/s  in-sys 1.9%  p50 3.1us  p99 938.5us  runq p50 24.6us p99 32.6us  connects 0 failed 0
 
-  SYSCALL                    WINDOW    RATE/s   IN-SYS       P50       P99        TOTAL
-  futex                          60      20.0     1.8%   786.4us     1.0ms          160
-  read                         1200     400.0     0.1%     3.1us     4.1us         3200
+  SYSCALL              WIN-CALLS   IN-SYS   WIN-P50   WIN-P99 |      CALLS      MEAN       P50       P99
+  futex                       60     1.8%   786.4us     1.0ms |        160   900.0us   786.4us     1.0ms
+  read                      1200     0.1%     3.1us     4.1us |       3200     3.0us     3.1us     4.1us
 
   futex latency (window, 60 calls)
        524us .. 1ms      |########################################| 60

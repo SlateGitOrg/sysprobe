@@ -403,7 +403,7 @@ func TestScreenKeys(t *testing.T) {
 
 func TestFilterMetrics(t *testing.T) {
 	in := "a 1\nb 2\nab 3\n"
-	if filterMetrics(in, "") != in || filterMetrics(in, "a") != "a 1\nab 3\n" {
+	if filterMetrics(in, "") != in || filterMetrics(in, "a") != "a 1\nab 3\n" || filterMetrics(in, "a,b") != "ab 3\n" {
 		t.Fatal("filter")
 	}
 }

@@ -51,7 +51,7 @@ func (k SortKey) Next() SortKey {
 // Options controls rendering.
 type Options struct {
 	Sort SortKey
-	// Rows caps the process table (default 20).
+	// Rows caps the process table (default 20; negative hides the table).
 	Rows int
 	// Dests caps the destination table (default 5); Events caps the recent
 	// event list (default 8). Zero means default; negative hides the section.
@@ -166,11 +166,15 @@ func Render(v *aggregate.View, o Options) string {
 		fmt.Fprintf(&b, "kernel drops  %s\n", d)
 	}
 	b.WriteString("\n")
-	fmt.Fprintf(&b, "%7s %-15s %8s %7s %8s %8s  %-26s %8s %8s %5s\n",
-		"PID", "COMM", "SYSC/s", "IN-SYS", "P50", "P99", "TOP SYSCALL (IN-SYS)", "RUNQ/s", "RQ-P99", "CONN")
 	rows := procs
 	if o.Rows > 0 && len(rows) > o.Rows {
 		rows = rows[:o.Rows]
+	}
+	if o.Rows < 0 {
+		rows = nil
+	} else {
+		fmt.Fprintf(&b, "%7s %-15s %8s %7s %8s %8s  %-26s %8s %8s %5s\n",
+			"PID", "COMM", "SYSC/s", "IN-SYS", "P50", "P99", "TOP SYSCALL (IN-SYS)", "RUNQ/s", "RQ-P99", "CONN")
 	}
 	for i := range rows {
 		p := &rows[i]
@@ -191,7 +195,7 @@ func Render(v *aggregate.View, o Options) string {
 			p.TGID, comm, rate(p.SyscallRate), pct(p.SyscallBusy), Dur(p.SyscallP50), Dur(p.SyscallP99),
 			topSys, rate(p.RunqRate), Dur(p.RunqP99), conn)
 	}
-	if hidden := len(procs) - len(rows); hidden > 0 {
+	if hidden := len(procs) - len(rows); hidden > 0 && o.Rows >= 0 {
 		fmt.Fprintf(&b, "        ... %d more\n", hidden)
 	}
 	if o.Dests > 0 && len(v.Dests) > 0 {
@@ -222,6 +226,9 @@ func eventLine(e *events.TCPEvent, base uint64) string {
 		who = fmt.Sprintf("%s(%d)", e.Comm, e.TGID)
 	}
 	src := fmt.Sprintf("%s:%d", e.SAddr, e.SPort)
+	if e.SPort == 0 {
+		src = e.SAddr.String() + ":*" // failed connects can lose their port before the event
+	}
 	lat := ""
 	if e.Kind != events.TCPRetransmit {
 		lat = Dur(e.Latency)
