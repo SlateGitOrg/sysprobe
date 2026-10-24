@@ -55,7 +55,7 @@ func TestReplayCommand(t *testing.T) {
 		{"replay", "missing.jsonl"},
 		{"replay", "-sort", "cpu", demoFixture(t)},
 		{"replay", "-prom-labels", "tid", demoFixture(t)},
-		{"replay", "-pid", "1", demoFixture(t)},
+		{"replay", "-pid", "4294967295", demoFixture(t)}, // never a real pid
 		{"replay", "-nope", demoFixture(t)},
 	}
 	for _, args := range bad {
