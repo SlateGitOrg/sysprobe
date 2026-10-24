@@ -1,0 +1,68 @@
+name: CI
+on:
+  push:
+    branches: [main, 'feature/**']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  GOLANGCI_LINT_VERSION: v2.13.2
+
+jobs:
+  check:
+    name: make check (format, lint host+linux, tests, coverage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/${GOLANGCI_LINT_VERSION}/install.sh \
+            | sh -s -- -b "$(go env GOPATH)/bin" "${GOLANGCI_LINT_VERSION}"
+      - run: make check
+      - run: make demo
+
+  bpf:
+    name: BPF objects rebuild bit-for-bit in the builder image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make bpf-verify
+
+  integration:
+    name: privileged integration (runner kernel, sudo)
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Kernel facts
+        run: |
+          uname -a
+          ls -la /sys/kernel/btf/vmlinux
+      - name: Warm module and build caches as the runner user
+        run: go build ./... && go vet -tags integration ./integration/
+      - name: scripts/integration.sh as root
+        run: |
+          # root gets its own build cache (so the runner's stays writable) but
+          # reuses the already-downloaded module cache read-only.
+          sudo env "PATH=$PATH" "GOMODCACHE=$(go env GOMODCACHE)" GOFLAGS=-mod=readonly \
+            SYSPROBE_WHERE="GitHub Actions ubuntu-latest runner, kernel $(uname -r) $(uname -m), sudo" \
+            sh scripts/integration.sh
+      - name: Unit tests still pass with the new recording added
+        run: go test -count=1 ./integration/ ./internal/...
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-${{ runner.os }}
+          path: |
+            integration/results/
+            testdata/recorded/
+            testdata/raw/
