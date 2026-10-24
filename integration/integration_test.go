@@ -38,7 +38,7 @@ type rawCapture struct {
 	mu     sync.Mutex
 	tcp    [][]byte
 	byKind map[events.TCPKind]int
-	hist map[string][][]byte // collector|keyhex -> latest per-CPU values
+	hist   map[string][][]byte // collector|keyhex -> latest per-CPU values
 }
 
 // RawTCP is one captured ring-buffer record and its decoding.
