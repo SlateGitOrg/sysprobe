@@ -1,0 +1,7 @@
+/bin/
+/coverage.out
+/coverage.html
+*.test
+*.prof
+/.cache/
+.DS_Store
