@@ -1,0 +1,10 @@
+process 100 postgres  window 10s
+  syscalls 2500.0/s  in-sys 42.0%  p50 3.0us  p99 2.0ms  runq p50 - p99 80.0us  connects 0 failed 0
+
+  SYSCALL                    WINDOW    RATE/s   IN-SYS       P50       P99        TOTAL
+  pread64                     20000    2000.0    40.0%     4.0us     2.0ms        24000
+  read                         5000     500.0     2.0%     1.0us     9.0us         6000
+  close                           0         -        -         -         -            2
+
+  pread64 latency (window, 20000 calls)
+         2us .. 4us      |########################################| 20000

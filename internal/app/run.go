@@ -150,6 +150,9 @@ type Screen struct {
 
 // NewScreen returns a screen drawing to out.
 func NewScreen(out io.Writer, o top.Options) *Screen {
+	if o.Sort == "" {
+		o.Sort = top.SortBusy
+	}
 	return &Screen{out: out, opts: o}
 }
 

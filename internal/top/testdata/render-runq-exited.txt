@@ -1,0 +1,8 @@
+sysprobe top  snapshot 12  elapsed 12s  window 10s  arch x86_64  sort runq  [paused]
+processes 4  tcp connects 3  failed 1  retransmits 2  series resets 1  evicted 4
+kernel drops  syscalls/missed_start=12
+
+    PID COMM              SYSC/s  IN-SYS      P50      P99  TOP SYSCALL (IN-SYS)         RUNQ/s   RQ-P99  CONN
+      7 a-very-long-co~      15k    5.0%    500ns   10.0us  getpid (5.0%)                  50.0    4.0ms     -
+    100 postgres          2500.0   42.0%    3.0us    2.0ms  pread64 (40.0%)               300.0   80.0us     -
+        ... 2 more

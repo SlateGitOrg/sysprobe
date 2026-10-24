@@ -1,0 +1,52 @@
+replaying SYNTHETIC fixture: kernel synthetic, arch x86_64, interval 1000ms, recorded by "internal/app churn()"
+note: hand-built: exit, pid reuse, exec rename, counter reset, tcp events
+
+sysprobe top  snapshot 8  elapsed 8s  window 3s  arch x86_64  sort busy
+processes 3  tcp connects 2  failed 1  retransmits 1  series resets 1  evicted 0
+kernel drops  syscalls/missed_start=3
+
+    PID COMM              SYSC/s  IN-SYS      P50      P99  TOP SYSCALL (IN-SYS)         RUNQ/s   RQ-P99  CONN
+    100 api                420.0    1.9%    3.1us  938.5us  futex (1.8%)                  300.0   32.6us     -
+    200 sleeper              1.0    0.3%    3.1ms    4.2ms  clock_nanosleep (0.3%)            -        -     -
+    300 worker              23.3    0.3%   98.3us  130.4us  read (0.3%)                       -        -     -
+
+TCP DESTINATION                            CONN   FAIL   RETX      P50      P99
+10.1.0.9:5432                                 2      0      1  131.1us  259.5us
+10.1.0.7:6379                                 0      1      0        -        -
+
+RECENT TCP EVENTS (newest first)
+  +3.2s      connect_fail api(100)               10.1.0.5:41004 -> 10.1.0.7:6379 30.0us
+  +3s        retransmit   softirq                10.1.0.5:41002 -> 10.1.0.9:5432
+  +100ms     connect      api(100)               10.1.0.5:41002 -> 10.1.0.9:5432 90.0us
+  +0s        connect      api(100)               10.1.0.5:41000 -> 10.1.0.9:5432 150.0us
+
+process 100 api  window 3s
+  syscalls 420.0/s  in-sys 1.9%  p50 3.1us  p99 938.5us  runq p50 24.6us p99 32.6us  connects 0 failed 0
+
+  SYSCALL                    WINDOW    RATE/s   IN-SYS       P50       P99        TOTAL
+  futex                          60      20.0     1.8%   786.4us     1.0ms          160
+  read                         1200     400.0     0.1%     3.1us     4.1us         3200
+
+  futex latency (window, 60 calls)
+       524us .. 1ms      |########################################| 60
+
+  read latency (window, 1200 calls)
+         2us .. 4us      |########################################| 1200
+
+# ---- Prometheus exposition (filter "comm=\"worker\"") ----
+sysprobe_syscall_latency_seconds_bucket{comm="worker",syscall="read",le="1.024e-06"} 0
+sysprobe_syscall_latency_seconds_bucket{comm="worker",syscall="read",le="4.096e-06"} 0
+sysprobe_syscall_latency_seconds_bucket{comm="worker",syscall="read",le="1.6384e-05"} 0
+sysprobe_syscall_latency_seconds_bucket{comm="worker",syscall="read",le="6.5536e-05"} 0
+sysprobe_syscall_latency_seconds_bucket{comm="worker",syscall="read",le="0.000262144"} 170
+sysprobe_syscall_latency_seconds_bucket{comm="worker",syscall="read",le="0.001048576"} 170
+sysprobe_syscall_latency_seconds_bucket{comm="worker",syscall="read",le="0.004194304"} 170
+sysprobe_syscall_latency_seconds_bucket{comm="worker",syscall="read",le="0.016777216"} 170
+sysprobe_syscall_latency_seconds_bucket{comm="worker",syscall="read",le="0.067108864"} 170
+sysprobe_syscall_latency_seconds_bucket{comm="worker",syscall="read",le="0.268435456"} 170
+sysprobe_syscall_latency_seconds_bucket{comm="worker",syscall="read",le="1.073741824"} 170
+sysprobe_syscall_latency_seconds_bucket{comm="worker",syscall="read",le="4.294967296"} 170
+sysprobe_syscall_latency_seconds_bucket{comm="worker",syscall="read",le="17.179869184"} 170
+sysprobe_syscall_latency_seconds_bucket{comm="worker",syscall="read",le="+Inf"} 170
+sysprobe_syscall_latency_seconds_sum{comm="worker",syscall="read"} 0.0204
+sysprobe_syscall_latency_seconds_count{comm="worker",syscall="read"} 170
