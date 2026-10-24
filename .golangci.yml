@@ -1,0 +1,43 @@
+version: "2"
+run:
+  build-tags: [integration]
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - misspell
+    - errorlint
+    - gocritic
+    - revive
+    - bodyclose
+    - nilerr
+    - unconvert
+    - prealloc
+  settings:
+    errcheck:
+      # Terminal/report output: a failed write to stdout is not actionable.
+      exclude-functions: [fmt.Fprint, fmt.Fprintf, fmt.Fprintln]
+    revive:
+      rules:
+        - name: exported
+        - name: package-comments
+        - name: var-naming
+        - name: indent-error-flow
+        - name: error-strings
+        - name: unused-parameter
+    gocritic:
+      disabled-checks: [ifElseChain]
+  exclusions:
+    generated: strict
+    rules:
+      - path: _test\.go
+        linters: [revive, prealloc]
+formatters:
+  enable: [gofmt, goimports]
+  settings:
+    goimports:
+      local-prefixes: [github.com/archit2501/sysprobe]

@@ -1,0 +1,17 @@
+{
+  "kernel": "7.0.14-linuxkit",
+  "arch": "aarch64",
+  "where": "privileged container (sysprobe-builder, --pid=host) on Docker 29.8.1 Docker Desktop, VM kernel 7.0.14-linuxkit aarch64, host Darwin arm64",
+  "syscall_pid": 37888,
+  "sleeps": 1694,
+  "sleep_ns": 3000000,
+  "reads": 6325696,
+  "workers": 2,
+  "tcp_pid": 37898,
+  "ok_port": 33017,
+  "closed_port": 38627,
+  "overflow_port": 53143,
+  "connects_ok": 20,
+  "refused": 1,
+  "timed_out": 2
+}

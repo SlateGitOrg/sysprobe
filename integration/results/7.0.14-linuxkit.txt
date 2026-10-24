@@ -1,0 +1,146 @@
+# sysprobe integration transcript
+date:   2026-10-24T01:19:07Z
+where:  privileged container (sysprobe-builder, --pid=host) on Docker 29.8.1 Docker Desktop, VM kernel 7.0.14-linuxkit aarch64, host Darwin arm64
+uname:  Linux d9c06b56f0c6 7.0.14-linuxkit #1 SMP PREEMPT Fri Sep 18 10:19:32 UTC 2026 aarch64 GNU/Linux
+cpus:   8
+clang:  Debian clang version 19.1.7 (3+b1)
+go:     go version go1.27.1 linux/arm64
+
+$ sysprobe doctor
+kernel 7.0.14-linuxkit (7.0.14), arch aarch64
+
+collector syscalls READY
+  [ok     ] kernel >= 4.17.0                     raw tracepoints (running 7.0.14-linuxkit)
+  [ok     ] privileges                           CAP_SYS_ADMIN, or CAP_BPF+CAP_PERFMON
+  [ok     ] per-CPU hash maps                    BPF_MAP_TYPE_PERCPU_HASH
+  [ok     ] tracepoint sys_enter                 btf_trace_sys_enter in kernel BTF
+  [ok     ] tracepoint sys_exit                  btf_trace_sys_exit in kernel BTF
+  [ok     ] tracepoint sched_process_exit        btf_trace_sched_process_exit in kernel BTF
+  [ok     ] tracepoint sched_process_exec        btf_trace_sched_process_exec in kernel BTF
+
+collector runq     READY
+  [ok     ] kernel >= 5.5.0                      BTF-typed tracepoints (running 7.0.14-linuxkit)
+  [ok     ] privileges                           CAP_SYS_ADMIN, or CAP_BPF+CAP_PERFMON
+  [ok     ] kernel BTF                           CONFIG_DEBUG_INFO_BTF=y (/sys/kernel/btf/vmlinux)
+  [ok     ] per-CPU hash maps                    BPF_MAP_TYPE_PERCPU_HASH
+  [ok     ] tracing programs                     BPF_PROG_TYPE_TRACING (tp_btf)
+  [ok     ] tracepoint sched_wakeup              btf_trace_sched_wakeup in kernel BTF
+  [ok     ] tracepoint sched_wakeup_new          btf_trace_sched_wakeup_new in kernel BTF
+  [ok     ] tracepoint sched_switch              btf_trace_sched_switch in kernel BTF
+  [ok     ] tracepoint sched_process_exit        btf_trace_sched_process_exit in kernel BTF
+  [ok     ] tracepoint sched_process_exec        btf_trace_sched_process_exec in kernel BTF
+
+collector tcp      READY
+  [ok     ] kernel >= 5.8.0                      BPF ring buffer (running 7.0.14-linuxkit)
+  [ok     ] privileges                           CAP_SYS_ADMIN, or CAP_BPF+CAP_PERFMON
+  [ok     ] kernel BTF                           CONFIG_DEBUG_INFO_BTF=y (/sys/kernel/btf/vmlinux)
+  [ok     ] tracing programs                     BPF_PROG_TYPE_TRACING (tp_btf)
+  [ok     ] ring buffer                          BPF_MAP_TYPE_RINGBUF
+  [ok     ] tracepoint inet_sock_set_state       btf_trace_inet_sock_set_state in kernel BTF
+  [ok     ] tracepoint tcp_retransmit_skb        btf_trace_tcp_retransmit_skb in kernel BTF
+
+$ SYSPROBE_RECORD_DIR=testdata go test -tags integration -count=1 -v ./integration/
+=== RUN   TestLiveKernel
+    integration_test.go:75: doctor:
+        kernel 7.0.14-linuxkit (7.0.14), arch aarch64
+        
+        collector syscalls READY
+          [ok     ] kernel >= 4.17.0                     raw tracepoints (running 7.0.14-linuxkit)
+          [ok     ] privileges                           CAP_SYS_ADMIN, or CAP_BPF+CAP_PERFMON
+          [ok     ] per-CPU hash maps                    BPF_MAP_TYPE_PERCPU_HASH
+          [ok     ] tracepoint sys_enter                 btf_trace_sys_enter in kernel BTF
+          [ok     ] tracepoint sys_exit                  btf_trace_sys_exit in kernel BTF
+          [ok     ] tracepoint sched_process_exit        btf_trace_sched_process_exit in kernel BTF
+          [ok     ] tracepoint sched_process_exec        btf_trace_sched_process_exec in kernel BTF
+        
+        collector runq     READY
+          [ok     ] kernel >= 5.5.0                      BTF-typed tracepoints (running 7.0.14-linuxkit)
+          [ok     ] privileges                           CAP_SYS_ADMIN, or CAP_BPF+CAP_PERFMON
+          [ok     ] kernel BTF                           CONFIG_DEBUG_INFO_BTF=y (/sys/kernel/btf/vmlinux)
+          [ok     ] per-CPU hash maps                    BPF_MAP_TYPE_PERCPU_HASH
+          [ok     ] tracing programs                     BPF_PROG_TYPE_TRACING (tp_btf)
+          [ok     ] tracepoint sched_wakeup              btf_trace_sched_wakeup in kernel BTF
+          [ok     ] tracepoint sched_wakeup_new          btf_trace_sched_wakeup_new in kernel BTF
+          [ok     ] tracepoint sched_switch              btf_trace_sched_switch in kernel BTF
+          [ok     ] tracepoint sched_process_exit        btf_trace_sched_process_exit in kernel BTF
+          [ok     ] tracepoint sched_process_exec        btf_trace_sched_process_exec in kernel BTF
+        
+        collector tcp      READY
+          [ok     ] kernel >= 5.8.0                      BPF ring buffer (running 7.0.14-linuxkit)
+          [ok     ] privileges                           CAP_SYS_ADMIN, or CAP_BPF+CAP_PERFMON
+          [ok     ] kernel BTF                           CONFIG_DEBUG_INFO_BTF=y (/sys/kernel/btf/vmlinux)
+          [ok     ] tracing programs                     BPF_PROG_TYPE_TRACING (tp_btf)
+          [ok     ] ring buffer                          BPF_MAP_TYPE_RINGBUF
+          [ok     ] tracepoint inet_sock_set_state       btf_trace_inet_sock_set_state in kernel BTF
+          [ok     ] tracepoint tcp_retransmit_skb        btf_trace_tcp_retransmit_skb in kernel BTF
+    integration_test.go:170: workload: {Kernel:7.0.14-linuxkit Arch:aarch64 Where:privileged container (sysprobe-builder, --pid=host) on Docker 29.8.1 Docker Desktop, VM kernel 7.0.14-linuxkit aarch64, host Darwin arm64 SyscallPID:37888 Sleeps:1694 SleepNs:3000000 Reads:6325696 Workers:2 TCPPID:37898 OKPort:33017 ClosedPort:38627 OverflowPort:53143 ConnectsOK:20 Refused:1 TimedOut:2}
+    integration_test.go:199: kernel counter runq/hist_insert_failed = 0
+    integration_test.go:199: kernel counter runq/missed_start = 0
+    integration_test.go:199: kernel counter runq/start_full = 0
+    integration_test.go:199: kernel counter syscalls/hist_insert_failed = 0
+    integration_test.go:199: kernel counter syscalls/missed_start = 94
+    integration_test.go:199: kernel counter syscalls/start_full = 0
+    integration_test.go:199: kernel counter tcp/decode_error = 0
+    integration_test.go:199: kernel counter tcp/missed_start = 0
+    integration_test.go:199: kernel counter tcp/queue_full = 0
+    integration_test.go:199: kernel counter tcp/ringbuf_full = 0
+    integration_test.go:199: kernel counter tcp/start_full = 0
+    integration_test.go:201: snapshots 19, processes 88, tcp connects 25 fails 3 retransmits 6
+    integration_test.go:205: recorded fixtures under /src/testdata (itest-7.0.14-linuxkit.*)
+--- PASS: TestLiveKernel (9.45s)
+=== RUN   TestRecordedFixturesMatchWorkload
+--- PASS: TestRecordedFixturesMatchWorkload (0.02s)
+=== RUN   TestVerifyDetectsWrongExpectations
+--- PASS: TestVerifyDetectsWrongExpectations (0.02s)
+=== RUN   TestCommTotalsCoverProcessTotals
+--- PASS: TestCommTotalsCoverProcessTotals (0.03s)
+=== RUN   TestLoadExpectErrors
+--- PASS: TestLoadExpectErrors (0.00s)
+PASS
+ok  	github.com/archit2501/sysprobe/integration	9.523s
+
+$ sysprobe record -o testdata/recorded/demo-7.0.14-linuxkit.jsonl -duration 8s   (with loadgen running)
+time=2026-10-24T01:19:18.779Z level=INFO msg="collector attached" collector=syscalls
+time=2026-10-24T01:19:18.807Z level=INFO msg="collector attached" collector=runq
+time=2026-10-24T01:19:18.831Z level=INFO msg="collector attached" collector=tcp
+sysprobe top  snapshot 9  elapsed 8.016s  window 8.016s  arch aarch64  sort busy
+processes 52  tcp connects 11  failed 3  retransmits 6  series resets 0  evicted 0
+kernel drops  runq/missed_start=1 syscalls/missed_start=73
+
+    PID COMM              SYSC/s  IN-SYS      P50      P99  TOP SYSCALL (IN-SYS)         RUNQ/s   RQ-P99  CONN
+    131 initd              141.0  547.5%   23.5us  963.0ms  futex (365.0%)                 67.9  197.7us     -
+    247 containerd         158.4  449.0%   18.8us  690.8ms  futex (356.7%)                 69.1  244.4us     -
+    267 dockerd            253.8  421.6%    6.8us  675.9ms  futex (321.7%)                 85.3  545.3us     -
+    884 ghc_worker          43.0  267.0%   10.6ms  985.5ms  futex (147.0%)                 36.3   92.9us     -
+   2566 auth                 9.6  187.4%  172.0us    4.02s  futex (124.7%)                  8.0   89.1us     -
+    743 containerd-shim     62.4  100.7%    932ns  671.1ms  futex (62.9%)                   8.9  676.3us     -
+   2535 .postgres-wrapp      1.0  100.2%  805.3ms    1.07s  epoll_pwait (100.2%)            1.0  125.8us     -
+   2527 nginx                1.1   88.1%  728.6ms    1.07s  epoll_pwait (88.1%)             1.0  251.7us     -
+    746 containerd-shim    107.2   71.8%    1.2us   63.1ms  futex (53.8%)                  20.7  351.3us     -
+  37458 containerd-shim     63.9   67.6%    718ns  615.6ms  futex (46.3%)                   7.9   27.6us     -
+    770 containerd-shim     62.0   50.9%    1.1us    1.1ms  futex (38.1%)                   8.4   43.6us     -
+   2544 containerd-shim     84.0   50.6%    656ns  433.6us  futex (37.9%)                  10.0  209.7us     -
+        ... 40 more
+
+TCP DESTINATION                            CONN   FAIL   RETX      P50      P99
+127.0.0.1:37195                              10      0      0   13.1us  124.5us
+127.0.0.1:56029                               1      2      6   32.8us   32.8us
+127.0.0.1:43699                               0      1      0        -        -
+
+RECENT TCP EVENTS (newest first)
+  +2.51s     connect_fail sysprobe-loadge(37967) 127.0.0.1:0 -> 127.0.0.1:56029 3.50s
+  +2.453s    connect_fail sysprobe-loadge(37967) 127.0.0.1:0 -> 127.0.0.1:56029 3.50s
+  +2.102s    retransmit   softirq                127.0.0.1:53884 -> 127.0.0.1:56029
+  +2.048s    retransmit   softirq                127.0.0.1:53872 -> 127.0.0.1:56029
+  +1.086s    retransmit   softirq                127.0.0.1:53884 -> 127.0.0.1:56029
+  +1.016s    retransmit   softirq                127.0.0.1:53872 -> 127.0.0.1:56029
+  +64ms      retransmit   softirq                127.0.0.1:53884 -> 127.0.0.1:56029
+  +0s        retransmit   softirq                127.0.0.1:53872 -> 127.0.0.1:56029
+
+# overhead: median of 7 runs of 2,000,000 getppid() calls, ns per call
+baseline (no probe)                  : 156.4546875 ns
+syscalls collector attached          : 346.732979 ns
+all collectors attached              : 346.066917 ns
+added per syscall: syscalls=190.3 ns, all=189.6 ns
+
+integration status: PASS
