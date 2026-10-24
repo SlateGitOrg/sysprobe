@@ -11,6 +11,13 @@
 //   - a per-comm total that is never evicted, so exported counters stay
 //     monotonic across process churn.
 //
+// A live process evicted over MaxProcesses still has its series in the
+// kernel maps. Its last readings are kept as a tombstone until the next
+// snapshot: if the tgid is in it, the new series difference against the
+// tombstone instead of zero, so the comm totals are not credited with the
+// whole cumulative history again; if not, the process exited and the
+// tombstone is dropped.
+//
 // Ingest is O(samples*Slots); View is O((processes*series)*Window*Slots).
 package aggregate
 
@@ -36,8 +43,10 @@ type Config struct {
 	// Retention is how many snapshots an exited process stays visible
 	// before it is evicted (default 30).
 	Retention int
-	// MaxProcesses caps tracked processes; the least recently active are
-	// evicted first (default 4096).
+	// MaxProcesses caps tracked processes; exited, then the least recently
+	// active are evicted first (default 4096). Evicting a live process
+	// leaves a one-snapshot tombstone of its last kernel readings so the
+	// comm totals stay exact when it is seen again.
 	MaxProcesses int
 	// MaxCommLabels caps distinct comm label values in exported totals;
 	// later comms fold into "other" (default 256).
@@ -73,6 +82,14 @@ func (c Config) withDefaults() Config {
 // ErrOutOfOrder is returned when a snapshot does not follow the previous one.
 var ErrOutOfOrder = errors.New("snapshot out of order")
 
+// tomb holds the last kernel readings of a live process evicted over
+// MaxProcesses. It lives until the next snapshot is ingested.
+type tomb struct {
+	sys     map[uint32]hist.Log2
+	runq    hist.Log2
+	hasRunq bool
+}
+
 type series struct {
 	last  hist.Log2 // previous cumulative kernel reading
 	total hist.Log2 // accumulated deltas since first seen
@@ -86,6 +103,7 @@ type process struct {
 	lastSeq  uint64 // last snapshot with any data for this process
 	exitSeq  uint64 // snapshot at which its kernel series vanished (0: alive)
 	hasHist  bool
+	seed     *tomb // readings to difference new series against (this snapshot only)
 	sys      map[uint32]*series
 	runq     *series
 	connOK   *series // connect latency histograms built from events
@@ -116,6 +134,7 @@ type Aggregator struct {
 	steps   steps
 
 	procs map[uint32]*process
+	tombs map[uint32]*tomb // live processes evicted by the last snapshot
 
 	comms     *labels.Sticky
 	commSys   map[commSys]*hist.Log2
@@ -145,6 +164,7 @@ func New(cfg Config) (*Aggregator, error) {
 		table:     t,
 		steps:     newSteps(cfg.Window),
 		procs:     make(map[uint32]*process),
+		tombs:     make(map[uint32]*tomb),
 		comms:     labels.NewSticky(cfg.MaxCommLabels),
 		commSys:   make(map[commSys]*hist.Log2),
 		commRunq:  make(map[string]*hist.Log2),
@@ -175,6 +195,9 @@ func (a *Aggregator) Ingest(s *events.Snapshot) error {
 		sr := p.sys[x.NR]
 		if sr == nil {
 			sr = a.newSeries()
+			if p.seed != nil {
+				sr.last = p.seed.sys[x.NR]
+			}
 			p.sys[x.NR] = sr
 		}
 		d := a.advance(sr, &x.Hist)
@@ -185,6 +208,9 @@ func (a *Aggregator) Ingest(s *events.Snapshot) error {
 		p := a.histProcess(x.TGID, x.Comm, present)
 		if p.runq == nil {
 			p.runq = a.newSeries()
+			if p.seed != nil && p.seed.hasRunq {
+				p.runq.last = p.seed.runq
+			}
 		}
 		d := a.advance(p.runq, &x.Hist)
 		label := a.comms.Assign(p.comm)
@@ -195,7 +221,12 @@ func (a *Aggregator) Ingest(s *events.Snapshot) error {
 		}
 		t.Add(&d)
 	}
+	// Tombstones still here belong to tgids absent from this snapshot: the
+	// process exited and its kernel series are gone, so a later process
+	// with the same tgid must start from zero.
+	clear(a.tombs)
 	for _, p := range a.procs {
+		p.seed = nil
 		if _, ok := present[p.tgid]; !ok && p.hasHist && p.exitSeq == 0 {
 			p.exitSeq = s.Seq
 		}
@@ -224,6 +255,10 @@ func (a *Aggregator) histProcess(tgid uint32, comm string, present map[uint32]st
 	}
 	if p == nil {
 		p = &process{tgid: tgid, comm: comm, firstSeq: a.seq, sys: make(map[uint32]*series)}
+		if t := a.tombs[tgid]; t != nil {
+			p.seed = t // evicted while alive: its kernel series carried on
+			delete(a.tombs, tgid)
+		}
 		a.procs[tgid] = p
 	}
 	if comm != "" {
@@ -307,7 +342,8 @@ func (a *Aggregator) ingestTCP(e *events.TCPEvent) {
 
 // evict drops processes that exited more than Retention snapshots ago (or,
 // for event-only processes, have been silent that long), then enforces
-// MaxProcesses by evicting the least recently active.
+// MaxProcesses by evicting exited, then the least recently active. A live
+// process evicted by the cap leaves a tombstone of its last readings.
 func (a *Aggregator) evict() {
 	ret := uint64(a.cfg.Retention)
 	for tgid, p := range a.procs {
@@ -337,7 +373,22 @@ func (a *Aggregator) evict() {
 		return vi.tgid < vj.tgid
 	})
 	for _, p := range victims[:over] {
+		if p.hasHist && p.exitSeq == 0 {
+			a.tombs[p.tgid] = p.tomb()
+		}
 		delete(a.procs, p.tgid)
 		a.evicted++
 	}
+}
+
+// tomb copies the process's last kernel readings.
+func (p *process) tomb() *tomb {
+	t := &tomb{sys: make(map[uint32]hist.Log2, len(p.sys))}
+	for nr, sr := range p.sys {
+		t.sys[nr] = sr.last
+	}
+	if p.runq != nil {
+		t.runq, t.hasRunq = p.runq.last, true
+	}
+	return t
 }

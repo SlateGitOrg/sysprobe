@@ -204,6 +204,77 @@ func TestMaxProcessesEvictsLeastRecent(t *testing.T) {
 	}
 }
 
+// Live processes evicted over MaxProcesses are still in the kernel maps.
+// When they come back, only the activity since their last reading may be
+// added to the comm totals, or exported counters inflate every interval.
+func TestEvictedLiveProcessIsNotDoubleCounted(t *testing.T) {
+	a := newAgg(t, Config{MaxProcesses: 2})
+	for seq := uint64(1); seq <= 4; seq++ {
+		n := int(seq) * 10 // +10 calls per process per snapshot
+		mustIngest(t, a, snap(seq,
+			sc(1, 0, "w", h(n, 1000)), sc(2, 0, "w", h(n, 1000)), sc(3, 0, "w", h(n, 1000))))
+		v := a.View()
+		if len(v.Processes) != 2 {
+			t.Fatalf("seq %d: %d processes over cap 2", seq, len(v.Processes))
+		}
+		tot := a.Totals(false)
+		if len(tot.CommSys) != 1 || tot.CommSys[0].Hist.Count != uint64(3*n) {
+			t.Fatalf("seq %d: comm total %+v, want %d calls (evicted=%d resets=%d)",
+				seq, tot.CommSys, 3*n, v.Evicted, v.Resets)
+		}
+	}
+	mustIngest(t, a, snap(5,
+		sc(1, 0, "w", h(50, 1000)), sc(2, 0, "w", h(50, 1000)), sc(3, 0, "w", h(50, 1000)),
+		sc(1, 1, "w", h(5, 1000)), sc(1, 2, "w", h(5, 1000))))
+	got := map[string]uint64{}
+	for _, c := range a.Totals(false).CommSys {
+		got[c.Syscall] = c.Hist.Count
+	}
+	if got["read"] != 150 || got["write"] != 5 || got["open"] != 5 || len(got) != 3 {
+		t.Fatalf("new syscalls next to a returning process: %v", got)
+	}
+	if r := a.View().Resets; r != 0 {
+		t.Fatalf("eviction misread as %d resets", r)
+	}
+}
+
+// A returning evicted process shows its true rate, not a spike made of its
+// whole cumulative history.
+func TestEvictedLiveProcessReturnsWithTrueRate(t *testing.T) {
+	a := newAgg(t, Config{MaxProcesses: 2})
+	mustIngest(t, a, snap(1, sc(1, 0, "a", h(100, 1000)), sc(2, 0, "b", h(1, 1000)), sc(3, 0, "c", h(1, 1000))))
+	if proc(a.View(), 1) != nil {
+		t.Fatal("pid 1 should be the cap victim (lowest tgid on a tie)")
+	}
+	// pid 3 exits, so pid 1 fits again; it made 10 calls in this second.
+	mustIngest(t, a, snap(2, sc(1, 0, "a", h(110, 1000)), sc(2, 0, "b", h(2, 1000))))
+	p := proc(a.View(), 1)
+	if p == nil || len(p.Syscalls) != 1 || p.Syscalls[0].Count != 10 || p.Syscalls[0].Total != 10 {
+		t.Fatalf("returning process view %+v, want 10 calls", p)
+	}
+	if got := a.Totals(false).CommSys[0]; got.Comm != "a" || got.Hist.Count != 110 {
+		t.Fatalf("comm a total %+v, want 110", got)
+	}
+}
+
+// After an evicted live process exits (its kernel keys are garbage
+// collected), a new process reusing the tgid starts from zero again.
+func TestEvictedProcessThatExitsForgetsItsReading(t *testing.T) {
+	a := newAgg(t, Config{MaxProcesses: 2})
+	mustIngest(t, a, snap(1, sc(1, 0, "a", h(100, 1000)), sc(2, 0, "b", h(1, 1000)), sc(3, 0, "c", h(1, 1000))))
+	mustIngest(t, a, snap(2, sc(2, 0, "b", h(1, 1000)), sc(3, 0, "c", h(1, 1000))))
+	if n := len(a.tombs); n != 0 { // white-box: tombstones must not leak
+		t.Fatalf("%d tombstones kept for exited processes", n)
+	}
+	mustIngest(t, a, snap(3, sc(1, 0, "a", h(7, 1000)), sc(2, 0, "b", h(1, 1000))))
+	if got := a.Totals(false).CommSys[0]; got.Hist.Count != 107 {
+		t.Fatalf("comm a total %+v, want 100+7", got)
+	}
+	if r := a.View().Resets; r != 0 {
+		t.Fatalf("tgid reuse after exit misread as %d resets", r)
+	}
+}
+
 func TestCommLabelOverflowIsSticky(t *testing.T) {
 	a := newAgg(t, Config{MaxCommLabels: 1})
 	mustIngest(t, a, snap(1, sc(1, 0, "first", h(1, 1)), sc(2, 0, "second", h(1, 1))))
@@ -317,6 +388,75 @@ func TestCommTotalsMonotonicProperty(t *testing.T) {
 		if n := len(a.View().Processes); n > 6 {
 			t.Fatalf("seq %d: %d processes over cap", seq, n)
 		}
+	}
+}
+
+// Property: under random churn with the process cap far below the number
+// of live processes, every comm total equals the sum of the true per-key
+// deltas. The model follows the kernel: a tgid missing from a snapshot has
+// exited and its keys are gone; a key can also be re-created on its own.
+func TestCommTotalsExactUnderEvictionProperty(t *testing.T) {
+	r := rand.New(rand.NewPCG(11, 12))
+	a := newAgg(t, Config{Retention: 2, MaxProcesses: 3, Window: 4})
+	cum := map[[2]uint32]hist.Log2{} // {tgid, nr}; nr 99 is the runq series
+	wantSys := map[string]uint64{}   // comm/syscall -> calls
+	wantRunq := map[string]uint64{}  // comm -> waits
+	comms := []string{"a", "b", "c"}
+	step := func(k [2]uint32) (hist.Log2, hist.Log2) {
+		prev := cum[k]
+		c := prev
+		if r.IntN(30) == 0 {
+			c = hist.Log2{}
+		}
+		for range r.IntN(6) {
+			c.Record(uint64(1 + r.IntN(1<<20)))
+		}
+		cum[k] = c
+		d, ok := c.Sub(&prev)
+		if !ok {
+			d = c
+		}
+		return c, d
+	}
+	for seq := uint64(1); seq <= 400; seq++ {
+		s := snap(seq)
+		for tgid := uint32(1); tgid <= 10; tgid++ {
+			if r.IntN(8) == 0 {
+				for k := range cum {
+					if k[0] == tgid {
+						delete(cum, k) // exited: the kernel GCs its keys
+					}
+				}
+				continue
+			}
+			comm := comms[r.IntN(len(comms))]
+			for nr := uint32(0); nr < 3; nr++ {
+				c, d := step([2]uint32{tgid, nr})
+				s.Syscalls = append(s.Syscalls, sc(tgid, nr, comm, c))
+				wantSys[comm+"/"+a.table.Name(nr)] += d.Count
+			}
+			c, d := step([2]uint32{tgid, 99})
+			s.Runq = append(s.Runq, events.RunqSample{TGID: tgid, Comm: comm, Hist: c})
+			wantRunq[comm] += d.Count
+		}
+		mustIngest(t, a, s)
+		tot := a.Totals(false)
+		for _, ct := range tot.CommSys {
+			if key := ct.Comm + "/" + ct.Syscall; ct.Hist.Count != wantSys[key] {
+				t.Fatalf("seq %d: %s total %d, want %d (evicted=%d)", seq, key, ct.Hist.Count, wantSys[key], tot.Evicted)
+			}
+		}
+		for _, ct := range tot.CommRunq {
+			if ct.Hist.Count != wantRunq[ct.Comm] {
+				t.Fatalf("seq %d: runq %s total %d, want %d", seq, ct.Comm, ct.Hist.Count, wantRunq[ct.Comm])
+			}
+		}
+		if tot.Processes > 3 {
+			t.Fatalf("seq %d: %d processes over cap", seq, tot.Processes)
+		}
+	}
+	if v := a.View(); v.Evicted < 1000 {
+		t.Fatalf("property did not exercise live eviction: evicted=%d", v.Evicted)
 	}
 }
 
