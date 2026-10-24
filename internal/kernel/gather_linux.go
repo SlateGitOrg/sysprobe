@@ -5,15 +5,12 @@ package kernel
 import (
 	"bytes"
 	"os"
-	"path/filepath"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/features"
 	"golang.org/x/sys/unix"
 )
-
-// TraceFSRoots are the locations probed for tracefs, in order.
-var TraceFSRoots = []string{"/sys/kernel/tracing", "/sys/kernel/debug/tracing"}
 
 // Gather inspects the running Linux host.
 func Gather() Facts {
@@ -24,22 +21,15 @@ func Gather() Facts {
 		f.Arch = string(bytes.TrimRight(u.Machine[:], "\x00"))
 	}
 	f.Version, _ = ParseRelease(f.Release)
-	if fh, err := os.Open("/sys/kernel/btf/vmlinux"); err == nil {
+	if spec, err := btf.LoadKernelSpec(); err == nil {
 		f.BTF = true
-		_ = fh.Close()
-	}
-	f.Tracepoints = map[string]bool{}
-	for _, root := range TraceFSRoots {
-		if _, err := os.Stat(filepath.Join(root, "events")); err != nil {
-			continue
-		}
-		f.TraceFS = true
+		f.Tracepoints = map[string]bool{}
 		for _, tp := range Tracepoints {
-			if _, err := os.Stat(filepath.Join(root, "events", tp)); err == nil {
+			var td *btf.Typedef
+			if err := spec.TypeByName("btf_trace_"+tp, &td); err == nil {
 				f.Tracepoints[tp] = true
 			}
 		}
-		break
 	}
 	if status, err := os.ReadFile("/proc/self/status"); err == nil {
 		f.CapEff, _ = ParseCapEff(string(status))

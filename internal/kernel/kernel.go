@@ -74,12 +74,13 @@ type Facts struct {
 	Version   Version
 	Arch      string
 	BTF       bool // /sys/kernel/btf/vmlinux readable
-	TraceFS   bool // tracefs (or debugfs/tracing) mounted
 	CapEff    uint64
 	RingBuf   bool // BPF_MAP_TYPE_RINGBUF supported
 	Tracing   bool // BPF_PROG_TYPE_TRACING (tp_btf) supported
 	PerCPUMap bool // BPF_MAP_TYPE_PERCPU_HASH supported
-	// Tracepoints lists the tracepoints found in tracefs ("group/name").
+	// Tracepoints holds the tracepoints found in kernel BTF (a
+	// "btf_trace_<name>" typedef exists for every tracepoint). Without BTF
+	// it is nil and tracepoint presence is unverified.
 	Tracepoints map[string]bool
 }
 
@@ -116,7 +117,10 @@ func (c *Collector) Ready() bool {
 }
 
 func tp(f *Facts, name string) Check {
-	return Check{Name: "tracepoint " + name, OK: f.Tracepoints[name], Detail: "/sys/kernel/tracing/events/" + name}
+	if f.Tracepoints == nil {
+		return Check{Name: "tracepoint " + name, OK: true, Detail: "unverified (no kernel BTF to inspect)"}
+	}
+	return Check{Name: "tracepoint " + name, OK: f.Tracepoints[name], Detail: "btf_trace_" + name + " in kernel BTF"}
 }
 
 func minVersion(f *Facts, v Version, why string) Check {
@@ -124,27 +128,27 @@ func minVersion(f *Facts, v Version, why string) Check {
 }
 
 // Evaluate returns the per-collector requirement checks for a host.
+// sysprobe attaches only raw and BTF-typed tracepoints, so tracefs is never
+// required.
 func Evaluate(f *Facts) []Collector {
 	priv := Check{Name: "privileges", OK: f.Privileged(), Detail: "CAP_SYS_ADMIN, or CAP_BPF+CAP_PERFMON"}
-	tfs := Check{Name: "tracefs", OK: f.TraceFS, Detail: "mount -t tracefs nodev /sys/kernel/tracing"}
 	btf := Check{Name: "kernel BTF", OK: f.BTF, Detail: "CONFIG_DEBUG_INFO_BTF=y (/sys/kernel/btf/vmlinux)"}
 	percpu := Check{Name: "per-CPU hash maps", OK: f.PerCPUMap, Detail: "BPF_MAP_TYPE_PERCPU_HASH"}
+	tracing := Check{Name: "tracing programs", OK: f.Tracing, Detail: "BPF_PROG_TYPE_TRACING (tp_btf)"}
 	return []Collector{
 		{Name: "syscalls", Checks: []Check{
-			minVersion(f, Version{4, 7, 0}, "BPF on tracepoints"), priv, tfs, percpu,
-			tp(f, "raw_syscalls/sys_enter"), tp(f, "raw_syscalls/sys_exit"), tp(f, "sched/sched_process_exit"), tp(f, "sched/sched_process_exec"),
+			minVersion(f, Version{4, 17, 0}, "raw tracepoints"), priv, percpu,
+			tp(f, "sys_enter"), tp(f, "sys_exit"), tp(f, "sched_process_exit"), tp(f, "sched_process_exec"),
 		}},
 		{Name: "runq", Checks: []Check{
-			minVersion(f, Version{5, 5, 0}, "BTF-typed tracepoints (tp_btf)"), priv, btf, percpu,
-			{Name: "tracing programs", OK: f.Tracing, Detail: "BPF_PROG_TYPE_TRACING"},
-			tfs, tp(f, "sched/sched_wakeup"), tp(f, "sched/sched_wakeup_new"), tp(f, "sched/sched_switch"),
-			tp(f, "sched/sched_process_exit"), tp(f, "sched/sched_process_exec"),
+			minVersion(f, Version{5, 5, 0}, "BTF-typed tracepoints"), priv, btf, percpu, tracing,
+			tp(f, "sched_wakeup"), tp(f, "sched_wakeup_new"), tp(f, "sched_switch"),
+			tp(f, "sched_process_exit"), tp(f, "sched_process_exec"),
 		}},
 		{Name: "tcp", Checks: []Check{
-			minVersion(f, Version{5, 8, 0}, "BPF ring buffer"), priv, btf, tfs,
+			minVersion(f, Version{5, 8, 0}, "BPF ring buffer"), priv, btf, tracing,
 			{Name: "ring buffer", OK: f.RingBuf, Detail: "BPF_MAP_TYPE_RINGBUF"},
-			{Name: "tracing programs", OK: f.Tracing, Detail: "BPF_PROG_TYPE_TRACING"},
-			tp(f, "sock/inet_sock_set_state"), tp(f, "tcp/tcp_retransmit_skb"),
+			tp(f, "inet_sock_set_state"), tp(f, "tcp_retransmit_skb"),
 		}},
 	}
 }
@@ -172,7 +176,7 @@ func Report(f *Facts, cs []Collector) string {
 
 // Tracepoints is the full list sysprobe attaches to.
 var Tracepoints = []string{
-	"raw_syscalls/sys_enter", "raw_syscalls/sys_exit",
-	"sched/sched_wakeup", "sched/sched_wakeup_new", "sched/sched_switch", "sched/sched_process_exit", "sched/sched_process_exec",
-	"sock/inet_sock_set_state", "tcp/tcp_retransmit_skb",
+	"sys_enter", "sys_exit", "sched_process_exit", "sched_process_exec",
+	"sched_wakeup", "sched_wakeup_new", "sched_switch",
+	"inet_sock_set_state", "tcp_retransmit_skb",
 }

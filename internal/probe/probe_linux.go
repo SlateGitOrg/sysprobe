@@ -141,10 +141,10 @@ func setVar(spec *ebpf.CollectionSpec, name string, v uint32) error {
 	return vs.Set(v)
 }
 
-func (p *Probe) attachTP(group, name string, prog *ebpf.Program) error {
-	l, err := link.Tracepoint(group, name, prog, nil)
+func (p *Probe) attachRaw(name string, prog *ebpf.Program) error {
+	l, err := link.AttachRawTracepoint(link.RawTracepointOptions{Name: name, Program: prog})
 	if err != nil {
-		return fmt.Errorf("attach tracepoint %s/%s: %w", group, name, err)
+		return fmt.Errorf("attach raw_tracepoint/%s: %w", name, err)
 	}
 	p.closers = append(p.closers, l)
 	return nil
@@ -176,15 +176,15 @@ func (p *Probe) openSyscalls(self uint32) error {
 	}
 	p.closers = append(p.closers, &objs)
 	for _, a := range []struct {
-		group, name string
-		prog        *ebpf.Program
+		name string
+		prog *ebpf.Program
 	}{
-		{"raw_syscalls", "sys_enter", objs.SysEnter},
-		{"raw_syscalls", "sys_exit", objs.SysExit},
-		{"sched", "sched_process_exit", objs.SchedProcessExit},
-		{"sched", "sched_process_exec", objs.SchedProcessExec},
+		{"sys_enter", objs.SysEnter},
+		{"sys_exit", objs.SysExit},
+		{"sched_process_exit", objs.SchedProcessExit},
+		{"sched_process_exec", objs.SchedProcessExec},
 	} {
-		if err := p.attachTP(a.group, a.name, a.prog); err != nil {
+		if err := p.attachRaw(a.name, a.prog); err != nil {
 			return err
 		}
 	}
@@ -217,10 +217,10 @@ func (p *Probe) openRunq(self uint32) error {
 	if err := p.attachBTF(objs.SchedSwitch, "sched_switch"); err != nil {
 		return err
 	}
-	if err := p.attachTP("sched", "sched_process_exit", objs.SchedProcessExit); err != nil {
+	if err := p.attachRaw("sched_process_exit", objs.SchedProcessExit); err != nil {
 		return err
 	}
-	if err := p.attachTP("sched", "sched_process_exec", objs.SchedProcessExec); err != nil {
+	if err := p.attachRaw("sched_process_exec", objs.SchedProcessExec); err != nil {
 		return err
 	}
 	p.runq = &histSource{name: CollectorRunq, hist: objs.RunqHist, exited: objs.Exited, execComm: objs.ExecComm, stats: objs.Stats}
@@ -240,7 +240,7 @@ func (p *Probe) openTCP(uint32) error {
 		return loadErr(err)
 	}
 	p.closers = append(p.closers, &objs)
-	if err := p.attachTP("sock", "inet_sock_set_state", objs.InetSockSetState); err != nil {
+	if err := p.attachBTF(objs.InetSockSetState, "inet_sock_set_state"); err != nil {
 		return err
 	}
 	if err := p.attachBTF(objs.TcpRetransmitSkb, "tcp_retransmit_skb"); err != nil {

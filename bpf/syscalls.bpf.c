@@ -7,6 +7,10 @@
  * (tgid, syscall nr). Aggregation stays in the kernel: userspace only reads
  * the map once per interval, so cost does not scale with syscall rate on
  * the userspace side.
+ *
+ * The programs attach as raw tracepoints (kernel >= 4.17): they receive the
+ * tracepoint arguments directly instead of the record a classic tracepoint
+ * builds, and need neither tracefs nor kernel BTF.
  */
 #include <linux/types.h>
 #include <linux/bpf.h>
@@ -53,24 +57,36 @@ static __always_inline int skip(__u32 tgid)
 	return targ_tgid && tgid != targ_tgid;
 }
 
-SEC("tracepoint/raw_syscalls/sys_enter")
-int sys_enter(struct sys_enter_ctx *ctx)
+SEC("raw_tracepoint/sys_enter")
+int sys_enter(struct bpf_raw_tracepoint_args *ctx)
 {
 	__u64 id = bpf_get_current_pid_tgid();
 	__u32 tid = (__u32)id;
-	struct start s;
+	struct start *sp, s;
 
 	if (skip(id >> 32))
 		return 0;
+	/*
+	 * Hot path: the thread already has a slot, so write it in place. A map
+	 * update on an LRU hash allocates and swaps an element, which costs
+	 * several times a lookup; slots are therefore never deleted, only
+	 * invalidated (ts = 0) at exit and recycled by LRU eviction.
+	 */
+	sp = bpf_map_lookup_elem(&sys_start, &tid);
+	if (sp) {
+		sp->ts = bpf_ktime_get_ns();
+		sp->nr = (__s64)ctx->args[1]; /* sys_enter(struct pt_regs *regs, long id) */
+		return 0;
+	}
 	s.ts = bpf_ktime_get_ns();
-	s.nr = ctx->id;
-	if (bpf_map_update_elem(&sys_start, &tid, &s, BPF_ANY))
+	s.nr = (__s64)ctx->args[1];
+	if (bpf_map_update_elem(&sys_start, &tid, &s, BPF_NOEXIST))
 		stat_inc(STAT_START_FULL);
 	return 0;
 }
 
-SEC("tracepoint/raw_syscalls/sys_exit")
-int sys_exit(struct sys_exit_ctx *ctx)
+SEC("raw_tracepoint/sys_exit")
+int sys_exit(struct bpf_raw_tracepoint_args *ctx)
 {
 	__u64 id = bpf_get_current_pid_tgid();
 	__u32 tid = (__u32)id;
@@ -82,14 +98,14 @@ int sys_exit(struct sys_exit_ctx *ctx)
 	if (skip(id >> 32))
 		return 0;
 	s = bpf_map_lookup_elem(&sys_start, &tid);
-	if (!s) {
+	if (!s || !s->ts) {
 		stat_inc(STAT_MISSED_START);
 		return 0;
 	}
 	delta = bpf_ktime_get_ns() - s->ts;
 	key.tgid = id >> 32;
 	key.nr = (__u32)s->nr;
-	bpf_map_delete_elem(&sys_start, &tid);
+	s->ts = 0;
 	if (key.nr == (__u32)-1)
 		return 0;
 

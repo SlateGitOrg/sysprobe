@@ -46,49 +46,10 @@ struct sock_common {
 
 struct sock {
 	struct sock_common __sk_common;
-};
-
-struct trace_entry {
-	unsigned short type;
-	unsigned char flags;
-	unsigned char preempt_count;
-	int pid;
-};
-
-/* tracepoint sock/inet_sock_set_state (format stable since 4.16). */
-struct trace_event_raw_inet_sock_set_state {
-	struct trace_entry ent;
-	const void *skaddr;
-	int oldstate;
-	int newstate;
-	__u16 sport;
-	__u16 dport;
-	__u16 family;
-	__u16 protocol;
-	__u8 saddr[4];
-	__u8 daddr[4];
-	__u8 saddr_v6[16];
-	__u8 daddr_v6[16];
+	__u16 sk_protocol; /* a plain u16 since 5.6; tcp needs >= 5.8 anyway */
 };
 
 #pragma clang attribute pop
-
-/*
- * raw_syscalls tracepoint contexts. Their layout has not changed since the
- * tracepoints were introduced (2.6.32), so they are plain structs and the
- * syscall collector needs no kernel BTF at all.
- */
-struct sys_enter_ctx {
-	struct trace_entry ent;
-	long id;
-	unsigned long args[6];
-};
-
-struct sys_exit_ctx {
-	struct trace_entry ent;
-	long id;
-	long ret;
-};
 
 #define TASK_RUNNING 0
 #define IPPROTO_TCP 6

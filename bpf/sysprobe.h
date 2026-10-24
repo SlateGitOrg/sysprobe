@@ -131,7 +131,7 @@ struct comm_val {
 		__type(key, __u32); /* tgid */                           \
 		__type(value, struct comm_val);                          \
 	} exec_comm SEC(".maps");                                        \
-	SEC("tracepoint/sched/sched_process_exit")                       \
+	SEC("raw_tracepoint/sched_process_exit")                         \
 	int sched_process_exit(void *ctx)                                \
 	{                                                                \
 		__u64 id = bpf_get_current_pid_tgid();                   \
@@ -143,7 +143,7 @@ struct comm_val {
 		bpf_map_update_elem(&exited, &tgid, &ts, BPF_ANY);       \
 		return 0;                                                \
 	}                                                                \
-	SEC("tracepoint/sched/sched_process_exec")                       \
+	SEC("raw_tracepoint/sched_process_exec")                         \
 	int sched_process_exec(void *ctx)                                \
 	{                                                                \
 		__u32 tgid = bpf_get_current_pid_tgid() >> 32;           \
