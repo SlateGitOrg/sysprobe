@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/archit2501/sysprobe/internal/events"
-	"github.com/archit2501/sysprobe/internal/hist"
-	"github.com/archit2501/sysprobe/internal/labels"
+	"github.com/SlateGitOrg/sysprobe/internal/events"
+	"github.com/SlateGitOrg/sysprobe/internal/hist"
+	"github.com/SlateGitOrg/sysprobe/internal/labels"
 )
 
 // h builds a cumulative histogram holding n samples of ns each.

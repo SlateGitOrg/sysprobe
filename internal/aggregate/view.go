@@ -4,8 +4,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/archit2501/sysprobe/internal/events"
-	"github.com/archit2501/sysprobe/internal/hist"
+	"github.com/SlateGitOrg/sysprobe/internal/events"
+	"github.com/SlateGitOrg/sysprobe/internal/hist"
 )
 
 // SyscallView is one syscall of one process over the sliding window.

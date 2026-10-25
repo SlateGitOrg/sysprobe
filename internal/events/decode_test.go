@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/archit2501/sysprobe/internal/hist"
+	"github.com/SlateGitOrg/sysprobe/internal/hist"
 )
 
 // The Go layouts must match bpf/sysprobe.h; a drift would silently corrupt

@@ -1,4 +1,4 @@
-module github.com/archit2501/sysprobe
+module github.com/SlateGitOrg/sysprobe
 
 go 1.27.1
 

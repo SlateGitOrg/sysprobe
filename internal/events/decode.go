@@ -10,7 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/archit2501/sysprobe/internal/hist"
+	"github.com/SlateGitOrg/sysprobe/internal/hist"
 )
 
 // Raw layout sizes from bpf/sysprobe.h. All BPF objects are built for

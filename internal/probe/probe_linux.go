@@ -17,7 +17,7 @@ import (
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
 
-	"github.com/archit2501/sysprobe/internal/events"
+	"github.com/SlateGitOrg/sysprobe/internal/events"
 )
 
 // Stat indexes, mirroring STAT_* in bpf/sysprobe.h.

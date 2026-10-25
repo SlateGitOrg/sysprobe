@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/archit2501/sysprobe/internal/aggregate"
-	"github.com/archit2501/sysprobe/internal/hist"
+	"github.com/SlateGitOrg/sysprobe/internal/aggregate"
+	"github.com/SlateGitOrg/sysprobe/internal/hist"
 )
 
 // Verify checks that aggregated totals reflect the known workload. It

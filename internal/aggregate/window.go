@@ -3,7 +3,7 @@ package aggregate
 import (
 	"time"
 
-	"github.com/archit2501/sysprobe/internal/hist"
+	"github.com/SlateGitOrg/sysprobe/internal/hist"
 )
 
 // window keeps the per-snapshot deltas of one series for the last n

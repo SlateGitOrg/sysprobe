@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/archit2501/sysprobe/internal/aggregate"
-	"github.com/archit2501/sysprobe/internal/events"
-	"github.com/archit2501/sysprobe/internal/fixture"
-	"github.com/archit2501/sysprobe/internal/hist"
-	"github.com/archit2501/sysprobe/internal/source"
-	"github.com/archit2501/sysprobe/internal/top"
+	"github.com/SlateGitOrg/sysprobe/internal/aggregate"
+	"github.com/SlateGitOrg/sysprobe/internal/events"
+	"github.com/SlateGitOrg/sysprobe/internal/fixture"
+	"github.com/SlateGitOrg/sysprobe/internal/hist"
+	"github.com/SlateGitOrg/sysprobe/internal/source"
+	"github.com/SlateGitOrg/sysprobe/internal/top"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files and the synthetic fixture")
@@ -162,26 +162,45 @@ func TestReplaySyntheticGolden(t *testing.T) {
 	}
 }
 
+// Every recording made by `make integration` (or by the CI integration job,
+// which adds one for the runner's kernel next to the committed ones) must
+// replay cleanly. The expected header comes from the fixture itself, so the
+// test holds for any kernel and architecture.
 func TestReplayRecordedFixture(t *testing.T) {
 	files, _ := filepath.Glob("../../testdata/recorded/itest-*.jsonl")
 	if len(files) == 0 {
 		t.Fatal("no recorded fixture")
 	}
-	fh, err := os.Open(files[0])
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = fh.Close() }()
-	var out bytes.Buffer
-	if err := Replay(context.Background(), fh, &out, ReplayOptions{Metrics: true, MetricsFilter: "sysprobe-loadge"}); err != nil {
-		t.Fatal(err)
-	}
-	s := out.String()
-	for _, want := range []string{"replaying recorded fixture", "arch aarch64", "RECENT TCP EVENTS",
-		`sysprobe_syscall_latency_seconds_count{comm="sysprobe-loadge",syscall="clock_nanosleep"}`} {
-		if !strings.Contains(s, want) {
-			t.Errorf("output lacks %q", want)
-		}
+	for _, f := range files {
+		t.Run(filepath.Base(f), func(t *testing.T) {
+			raw, err := os.ReadFile(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fr, err := fixture.NewReader(bytes.NewReader(raw))
+			if err != nil {
+				t.Fatal(err)
+			}
+			h := fr.Header()
+			if h.Synthetic || h.Arch == "" || h.Kernel == "" {
+				t.Fatalf("recorded fixture has header %+v", h)
+			}
+			var out bytes.Buffer
+			if err := Replay(context.Background(), bytes.NewReader(raw), &out, ReplayOptions{Metrics: true, MetricsFilter: "sysprobe-loadge"}); err != nil {
+				t.Fatal(err)
+			}
+			s := out.String()
+			for _, want := range []string{
+				"replaying recorded fixture: kernel " + h.Kernel + ", arch " + h.Arch,
+				"arch " + h.Arch + "  sort busy",
+				"RECENT TCP EVENTS",
+				`sysprobe_syscall_latency_seconds_count{comm="sysprobe-loadge",syscall="clock_nanosleep"}`,
+			} {
+				if !strings.Contains(s, want) {
+					t.Errorf("output lacks %q", want)
+				}
+			}
+		})
 	}
 }
 

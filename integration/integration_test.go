@@ -17,12 +17,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/archit2501/sysprobe/internal/aggregate"
-	"github.com/archit2501/sysprobe/internal/app"
-	"github.com/archit2501/sysprobe/internal/events"
-	"github.com/archit2501/sysprobe/internal/kernel"
-	"github.com/archit2501/sysprobe/internal/probe"
-	"github.com/archit2501/sysprobe/internal/source"
+	"github.com/SlateGitOrg/sysprobe/internal/aggregate"
+	"github.com/SlateGitOrg/sysprobe/internal/app"
+	"github.com/SlateGitOrg/sysprobe/internal/events"
+	"github.com/SlateGitOrg/sysprobe/internal/kernel"
+	"github.com/SlateGitOrg/sysprobe/internal/probe"
+	"github.com/SlateGitOrg/sysprobe/internal/source"
 )
 
 func loadgen(t *testing.T, bin string, args ...string) []byte {

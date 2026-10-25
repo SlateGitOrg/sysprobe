@@ -13,7 +13,7 @@ COVER_MIN   ?= 80
 CORE_PKGS   := ./internal/hist ./internal/events ./internal/fixture ./internal/syscalls \
                ./internal/labels ./internal/aggregate ./internal/exporter ./internal/top \
                ./internal/kernel ./internal/source ./internal/app ./integration
-CORE_LIST   := $(shell echo $(CORE_PKGS) | sed 's| ./| github.com/archit2501/sysprobe/|g; s|^./|github.com/archit2501/sysprobe/|' | tr ' ' ',')
+CORE_LIST   := $(shell echo $(CORE_PKGS) | sed 's| ./| github.com/SlateGitOrg/sysprobe/|g; s|^./|github.com/SlateGitOrg/sysprobe/|' | tr ' ' ',')
 DEMO_FIXTURE ?= $(firstword $(wildcard testdata/recorded/demo-*.jsonl))
 DOCKER_RUN  := docker run --rm -v $(CURDIR):/src -v sysprobe-gomod:/go/pkg/mod -v sysprobe-gocache:/root/.cache/go-build
 

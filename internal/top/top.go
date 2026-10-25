@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/archit2501/sysprobe/internal/aggregate"
-	"github.com/archit2501/sysprobe/internal/events"
+	"github.com/SlateGitOrg/sysprobe/internal/aggregate"
+	"github.com/SlateGitOrg/sysprobe/internal/events"
 )
 
 // SortKey orders the process table.

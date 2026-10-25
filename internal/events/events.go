@@ -8,7 +8,7 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/archit2501/sysprobe/internal/hist"
+	"github.com/SlateGitOrg/sysprobe/internal/hist"
 )
 
 // SyscallSample is the cumulative latency histogram of one syscall number in

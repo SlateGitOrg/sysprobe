@@ -40,4 +40,4 @@ formatters:
   enable: [gofmt, goimports]
   settings:
     goimports:
-      local-prefixes: [github.com/archit2501/sysprobe]
+      local-prefixes: [github.com/SlateGitOrg/sysprobe]

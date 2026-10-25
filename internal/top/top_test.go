@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/archit2501/sysprobe/internal/aggregate"
-	"github.com/archit2501/sysprobe/internal/events"
-	"github.com/archit2501/sysprobe/internal/hist"
+	"github.com/SlateGitOrg/sysprobe/internal/aggregate"
+	"github.com/SlateGitOrg/sysprobe/internal/events"
+	"github.com/SlateGitOrg/sysprobe/internal/hist"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")

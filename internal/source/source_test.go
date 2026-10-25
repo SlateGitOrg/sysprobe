@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/archit2501/sysprobe/internal/events"
-	"github.com/archit2501/sysprobe/internal/fixture"
+	"github.com/SlateGitOrg/sysprobe/internal/events"
+	"github.com/SlateGitOrg/sysprobe/internal/fixture"
 )
 
 func stream(t *testing.T, n int) string {

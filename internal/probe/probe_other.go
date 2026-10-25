@@ -5,7 +5,7 @@ package probe
 import (
 	"context"
 
-	"github.com/archit2501/sysprobe/internal/events"
+	"github.com/SlateGitOrg/sysprobe/internal/events"
 )
 
 // Probe is unavailable on this OS.

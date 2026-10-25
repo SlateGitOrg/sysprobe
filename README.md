@@ -1,35 +1,63 @@
 # sysprobe
 
 An eBPF profiler for Linux that answers "which process is waiting on the
-kernel, for what, and for how long?" It records:
+kernel, for what, and for how long?", exported as Prometheus histograms and a
+top-style terminal view.
 
-- **per-process syscall latency histograms** (enter to exit, per syscall),
-- **run-queue latency** per process (runnable to running),
-- **TCP connect latency and retransmit events** (per destination),
-
-aggregates them in the kernel where possible, and exposes the result as
-**Prometheus histograms** and a **top-style terminal view**. Everything
-downstream of the kernel also runs offline against recorded fixtures, so the
-aggregation, exporter and UI are fully tested on a laptop with no eBPF at
-all.
+[![CI](https://github.com/SlateGitOrg/sysprobe/actions/workflows/ci.yml/badge.svg)](https://github.com/SlateGitOrg/sysprobe/actions/workflows/ci.yml)
 
 Go ([cilium/ebpf](https://github.com/cilium/ebpf) v0.22) for userspace, C for
 the BPF programs, compiled with clang 19 in a pinned Linux builder image
-(macOS clang has no BPF backend).
+(macOS clang has no BPF backend). The compiled objects are committed, so the
+Go code builds and tests on any OS without clang or Docker.
 
-**Who it is for:** engineers who want something between `strace -c` (too
-slow to leave on) and a full continuous-profiling stack: a single static
-binary that shows syscall and scheduler latency per process and can be
-scraped by Prometheus.
+## Why
 
-## Status, in one paragraph
+`strace -c` tells you which syscalls a process makes, but it stops the
+process on every call and is far too slow to leave running. A full
+continuous-profiling stack answers the question, but it is a platform to
+deploy. sysprobe sits in between: one static binary that keeps per-process
+syscall and scheduler latency histograms in the kernel at a fixed cost per
+event, and can be scraped by Prometheus or watched in a terminal.
 
-Built and verified end to end on one real kernel: Linux 7.0.14-linuxkit
-(aarch64), inside a privileged container on Docker Desktop for macOS. The
-committed transcript `integration/results/7.0.14-linuxkit.txt` is that run.
-The CI workflow adds a second kernel (the GitHub `ubuntu-latest` runner, with
-`sudo`) but **has never executed**: this repository has not been pushed. No
-production use is claimed.
+## Features
+
+- **Per-process syscall latency histograms** (enter to exit, per syscall),
+  aggregated in the kernel into per-CPU log2 histograms.
+- **Run-queue latency** per process (runnable to running), the runqlat
+  algorithm on BTF tracepoints.
+- **TCP connect latency, failed connects and SYN retransmits** per
+  destination, streamed individually through a BPF ring buffer.
+- **Prometheus exporter** (`sysprobe run`, `/metrics` and `/healthz`) with
+  bucket edges identical to the kernel's, bounded `comm` labels and counters
+  that never go backwards.
+- **Interactive top view** (`sysprobe top`): processes sorted by time spent
+  in syscalls, call rate, p99 or run-queue latency, plus TCP destinations and
+  recent TCP events; `replay -pid N` adds a per-syscall breakdown of one
+  process with ASCII latency histograms.
+- **Record and replay**: `sysprobe record` writes the snapshot stream to a
+  JSONL fixture; `sysprobe replay` runs the exact same aggregation, exporter
+  and view offline, without privileges, on any OS.
+- **`sysprobe doctor`**: checks kernel version, privileges, BTF and each
+  tracepoint per collector, so you know what will load before you try.
+- **Kernel drop accounting**: every sample the BPF side cannot store
+  (allocator exhausted, missed start timestamp, ring buffer full) is counted
+  and exported as `sysprobe_bpf_drops_total`.
+
+## Status
+
+Verified end to end on two kernels, both virtual machines:
+
+- **Linux 7.0.14-linuxkit, aarch64**, in a privileged container on Docker
+  Desktop for macOS. The recordings in `testdata/` and the transcript
+  `integration/results/7.0.14-linuxkit.txt` come from that run, and every
+  offline test and `make demo` use them.
+- **Linux 7.0.0-1017-azure, x86_64**, the GitHub-hosted `ubuntu-latest`
+  runner, where the CI `integration` job runs the same privileged test with
+  `sudo` on every push and uploads its transcript and recordings as a
+  workflow artifact (not committed).
+
+No production use is claimed.
 
 ## Architecture
 
@@ -66,16 +94,38 @@ decrease (the exporter). A recorded fixture is just a stream of those
 snapshots, which is why replay exercises exactly the same code as live use.
 Design details, algorithms and complexity: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## Quickstart
+## Quick start
 
-Offline, on any OS with Go 1.27:
+Prerequisites:
+
+- **Go 1.27.1** (the version in `go.mod`; with `GOTOOLCHAIN=auto`, the
+  default, any Go 1.21+ downloads it on first use).
+- For `make check` only: **golangci-lint v2.13.2**, the version CI pins.
+- For live collection: **Linux as root** (or `CAP_BPF` + `CAP_PERFMON`),
+  kernel >= 4.17 for `syscalls`, >= 5.5 with BTF for `runq`, >= 5.8 with BTF
+  for `tcp` ([docs/KERNEL.md](docs/KERNEL.md)).
+- For `make integration` and `make bpf`: **Docker**.
+
+Offline, on macOS or Linux (no root, clang or Docker):
+
+```sh
+git clone https://github.com/SlateGitOrg/sysprobe.git
+cd sysprobe
+go test ./...                        # every offline test; no linter, root or Docker needed
+make demo                            # replay the fixtures recorded on a real kernel
+go build -o sysprobe ./cmd/sysprobe
+./sysprobe replay -rows 5 -sort p99 testdata/recorded/demo-7.0.14-linuxkit.jsonl
+```
+
+The full gate, as CI runs it (install golangci-lint first, e.g. with the
+same command the workflow uses:
+`curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v2.13.2/install.sh | sh -s -- -b "$(go env GOPATH)/bin" v2.13.2`):
 
 ```sh
 make check      # gofmt, go vet (host + GOOS=linux), golangci-lint (host + linux), tests -race, coverage gate
-make demo       # replay the fixtures recorded on a real kernel
 ```
 
-Live, on Linux as root (kernel requirements: [docs/KERNEL.md](docs/KERNEL.md)):
+Live, on Linux as root:
 
 ```sh
 go build -o sysprobe ./cmd/sysprobe
@@ -85,6 +135,9 @@ sudo ./sysprobe run -listen :9464      # Prometheus on /metrics, /healthz
 sudo ./sysprobe record -o cap.jsonl -duration 30s
 ./sysprobe replay -pid 1234 -metrics cap.jsonl   # anywhere, no privileges
 ```
+
+`doctor` runs anywhere but only reports collectors as ready on Linux; on
+macOS it lists every requirement as missing and exits 1.
 
 From macOS with Docker (what produced the committed recordings):
 
@@ -96,7 +149,7 @@ make bpf           # recompile bpf/*.c into internal/probe/*_bpfel.o (committed)
 `make integration` prints `SKIP integration: Docker is not available` and
 exits 0 when there is no Docker daemon.
 
-## Demo output (real run)
+## Usage: demo output from a real run
 
 `make demo` replays two recordings made by `make integration`. Part 2 is the
 known workload from the integration test: `sysprobe-loadgen` with 2 threads
@@ -132,12 +185,12 @@ sysprobe_syscall_latency_seconds_count{comm="sysprobe-loadge",syscall="clock_nan
 The loadgen itself reported 1686 sleeps and 6,164,602 reads; the kernel
 counted 1686 `clock_nanosleep` and 6,164,606 `read` calls (four reads more
 than the loop's own count, made by the same process outside the measured
-loop; the verifier accepts `>=` for reads and an exact range for sleeps). The `nanosleep` and `futex` rows are the Go runtime
-(`runtime.usleep`, parking), which is exactly why the workload uses
-`clock_nanosleep`: the first version used `nanosleep`, and the integration
-test caught the runtime's calls mixed into the count. The four sub-millisecond
-`clock_nanosleep` samples are sleeps interrupted by Go's preemption signal
-(EINTR).
+loop; the verifier accepts `>=` for reads and an exact range for sleeps).
+The `nanosleep` and `futex` rows are the Go runtime (`runtime.usleep`,
+parking), which is exactly why the workload uses `clock_nanosleep`: the first
+version used `nanosleep`, and the integration test caught the runtime's calls
+mixed into the count. The four sub-millisecond `clock_nanosleep` samples are
+sleeps interrupted by Go's preemption signal (EINTR).
 
 Part 1 of the demo is the end-of-recording top view of the whole Docker VM
 (dockerd, containerd and the other containers that were running):
@@ -166,6 +219,13 @@ whose accept queue overflowed (1 connect, 2 time-outs, 6 SYN retransmits),
 and a closed port (1 refused connect, which loses its source port before the
 event fires, shown as `127.0.0.1:*` in the event list).
 
+Exported metrics: `sysprobe_syscall_latency_seconds`,
+`sysprobe_runq_latency_seconds`, `sysprobe_tcp_connect_latency_seconds`
+(histograms), `sysprobe_tcp_retransmits_total`, `sysprobe_bpf_drops_total`,
+`sysprobe_snapshots_total`, `sysprobe_series_resets_total`,
+`sysprobe_evicted_processes_total` and the `sysprobe_tracked_processes`
+gauge.
+
 ## Results and benchmarks (every number has its command)
 
 | What | Result | Command / source |
@@ -175,17 +235,21 @@ event fires, shown as `127.0.0.1:*` in the event list).
 | Probe overhead per syscall, syscalls collector | +191.4 ns (158.99 → 350.38 ns per `getppid()`, median of 7×2M calls) | `make integration`, last lines of the transcript |
 | Probe overhead per syscall, all collectors | +193.1 ns (158.99 → 352.07 ns) | same |
 | Core-logic test coverage | 97.3% of statements across the 12 core packages | `make cover` |
-| Aggregator ingest | 372 µs per snapshot of 2,000 series (≈186 ns/series), 5 allocs | `make bench` (`BenchmarkIngest`, macOS arm64 dev machine) |
+| Aggregator ingest | 372 µs per snapshot of 2,000 series (≈186 ns/series), 5 allocs | `make bench` (`BenchmarkIngest`, idle macOS arm64 dev machine) |
 | Top view build | 0.96 ms for 100 processes × 20 syscalls × 10-snapshot window | `make bench` (`BenchmarkView`) |
 | Quantile from a log2 histogram | 36 ns, 0 allocs | `make bench` (`BenchmarkQuantile`) |
 
 The overhead numbers come from a virtualised arm64 VM where a bare
 `getppid()` costs 159 ns; on bare metal both the baseline and the added cost
-will differ. They measure the worst case for this design (the cheapest
-possible syscall, so the probe's fixed cost dominates). More in
-[docs/KERNEL.md](docs/KERNEL.md#overhead).
+will differ (the x86_64 CI runner, another VM, measured +130 ns in one run;
+see [docs/KERNEL.md](docs/KERNEL.md#overhead)). They measure the worst case
+for this design: the cheapest possible syscall, so the probe's fixed cost
+dominates. Benchmark timings scale with hardware and load; the allocation
+counts do not.
 
-## Design decisions (short version; full list in [DECISIONS.md](DECISIONS.md))
+## Design decisions
+
+Short version; the full list with costs is in [DECISIONS.md](DECISIONS.md).
 
 - **Histograms in the kernel, events through a ring buffer.** Syscalls and
   context switches happen millions of times per second, so they are folded
@@ -208,8 +272,46 @@ possible syscall, so the probe's fixed cost dominates). More in
 - **Exit and exec from the kernel, not /proc.** Exited processes are
   garbage-collected from `sched_process_exit`, and processes are named after
   their group leader (`proc_comm`), so it works in any PID namespace.
+- **One boundary for live, replay and tests.** Everything above
+  `events.Snapshot` is identical whether the snapshot came from the kernel a
+  millisecond ago or from a recording, so the kernel-free tests cover the
+  real aggregation path.
 
-## Repository map
+## Testing
+
+```sh
+go test -race ./...     # or: make test
+make cover              # coverage gate: >= 80% over the 12 kernel-free packages
+make check              # everything above plus gofmt, go vet and golangci-lint for host and GOOS=linux
+```
+
+What the layers cover:
+
+- **Unit tests** for the log2 histogram (deltas, reset detection,
+  quantiles, Prometheus buckets), label admission, fixture round trips and
+  corruption, and kernel-requirement checks.
+- **Decoders against real kernel bytes**: `testdata/raw/` holds ring-buffer
+  records and per-CPU histogram values captured from the kernel together with
+  the decoding made at capture time; the tests decode them again and compare.
+- **Synthetic churn fixture** (`testdata/synthetic/churn.jsonl`) for what
+  short live recordings rarely show: process exit, PID reuse, exec rename,
+  counter reset and all three TCP event kinds.
+- **Golden tests** for the top view, process detail and replay output
+  (`internal/top/testdata`, `internal/app/testdata`).
+- **Offline integration verifier** (`go test ./integration/`): replays every
+  committed recording, checks it against the workload's own ground truth, and
+  checks that 8 deliberately wrong expectations are each rejected.
+- **Privileged live test** (`make integration` locally, the `integration`
+  job in CI): loads the BPF programs, runs `sysprobe-loadgen`, verifies the
+  counts, records new fixtures and benchmarks overhead. In CI the job then
+  reruns the unit tests with the runner's new recording added; the replay
+  tests take the expected kernel and architecture from each fixture's
+  header, so a recording from any machine slots in.
+- **BPF objects**: the CI `bpf` job rebuilds `internal/probe/*_bpfel.o` in
+  the pinned builder image and fails if they differ by a byte from the
+  committed ones (`make bpf-verify`).
+
+## Project layout
 
 | Path | What |
 |---|---|
@@ -225,17 +327,21 @@ possible syscall, so the probe's fixed cost dominates). More in
 | `internal/app`, `cmd/sysprobe` | pipelines and CLI |
 | `cmd/sysprobe-loadgen` | benign loopback workload for tests, demo and overhead benchmark |
 | `integration/` | privileged end-to-end test, workload ground truth, offline verifier, transcripts |
-| `testdata/` | recorded fixtures (real kernel), raw kernel bytes, one synthetic fixture |
+| `testdata/` | recorded fixtures (real kernel), raw kernel bytes, one synthetic fixture ([DATA.md](DATA.md)) |
+| `build/`, `scripts/` | pinned builder image, integration script, syscall-table generator |
+| `docs/` | [architecture and algorithms](docs/ARCHITECTURE.md), [kernel requirements and overhead](docs/KERNEL.md) |
 
 ## Limitations
 
-- **One kernel verified.** Only Linux 7.0.14-linuxkit/aarch64 (a VM) has
-  actually run the BPF programs. x86_64 is supported by design (same `bpfel`
-  objects, x86_64 syscall table, CO-RE) but has not been executed; the CI job
-  that would do it has not run because nothing has been pushed.
-- **Overhead measured in a VM, on one syscall type.** +191 ns per syscall
-  is real but specific to that VM and to `getppid()`. Syscall-heavy
-  workloads (millions of syscalls per second per core) will feel it.
+- **Two kernels verified, both 7.0 and both VMs.** Linux 7.0.14-linuxkit
+  (aarch64) and 7.0.0-1017-azure (x86_64, in CI) have run the BPF programs.
+  Older kernels down to the documented minimums are supported by design
+  (CO-RE relocations, per-collector feature checks in `doctor`) but have not
+  been executed.
+- **Overhead measured in VMs, on one syscall type.** +191 ns (arm64 Docker
+  VM) and +130 ns (x86_64 CI runner, one run) per `getppid()` are real but
+  specific to those VMs. Syscall-heavy workloads (millions of syscalls per
+  second per core) will feel it.
 - **Blocking syscalls dominate IN-SYS.** `futex`, `epoll_wait` and friends
   are counted like any other syscall; there is no off-CPU/on-CPU split.
 - **Process names are best effort.** The authoritative name comes from exec
@@ -262,8 +368,9 @@ possible syscall, so the probe's fixed cost dominates). More in
 
 ## Roadmap
 
-1. Run the CI integration job on an x86_64 runner kernel and commit that
-   transcript next to the linuxkit one.
+1. Commit an x86_64 recording from the CI runner next to the linuxkit one, so
+   the offline tests and the demo also cover the x86_64 syscall table with
+   real data.
 2. Task-local storage (`BPF_MAP_TYPE_TASK_STORAGE`) for syscall start
    timestamps on BTF kernels, to cut the per-syscall cost below the LRU hash
    lookup.
@@ -272,5 +379,5 @@ possible syscall, so the probe's fixed cost dominates). More in
 
 ## License
 
-MIT, see [LICENSE](LICENSE). The BPF programs declare `Dual MIT/GPL` because
+MIT — see [LICENSE](LICENSE). The BPF programs declare `Dual MIT/GPL` because
 the kernel requires a GPL-compatible license for the helpers they use.

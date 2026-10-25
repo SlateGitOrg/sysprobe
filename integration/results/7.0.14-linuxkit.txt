@@ -97,7 +97,7 @@ $ SYSPROBE_RECORD_DIR=testdata go test -tags integration -count=1 -v ./integrati
 === RUN   TestLoadExpectErrors
 --- PASS: TestLoadExpectErrors (0.00s)
 PASS
-ok  	github.com/archit2501/sysprobe/integration	9.608s
+ok  	github.com/SlateGitOrg/sysprobe/integration	9.608s
 
 $ sysprobe record -o testdata/recorded/demo-7.0.14-linuxkit.jsonl -duration 8s   (with loadgen running)
 time=2026-10-24T01:29:47.724Z level=INFO msg="collector attached" collector=syscalls

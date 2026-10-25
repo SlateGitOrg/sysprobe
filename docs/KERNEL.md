@@ -31,8 +31,10 @@ All collectors need:
 Architectures: the BPF objects are built for little-endian BPF (`bpfel`) and
 contain no architecture-specific register access, so the same objects serve
 x86_64 and arm64. Syscall names come from per-architecture tables
-(`internal/syscalls`, generated from `ausyscall`). **Only arm64 has been run**
-(see the README's status section).
+(`internal/syscalls`, generated from `ausyscall`). Both architectures have
+run the programs: aarch64 in the Docker Desktop VM that produced the committed
+recordings, and x86_64 on the GitHub-hosted runner in the CI `integration`
+job (see the README's status section).
 
 ### In containers
 
@@ -73,6 +75,13 @@ configurations and takes the median:
 
 Source: last lines of `integration/results/7.0.14-linuxkit.txt`. Environment:
 Linux 7.0.14-linuxkit aarch64, 8 vCPUs, Docker Desktop VM on an arm64 Mac.
+
+The CI `integration` job runs the same script on the GitHub-hosted x86_64
+runner and prints the same three lines in its log (its transcript is uploaded
+as the `integration-Linux` workflow artifact, not committed). One such run, on
+kernel 7.0.0-1017-azure with 2 vCPUs, measured 98.6 ns without the probe and
+228.8 ns with either configuration attached: +130.2 ns per syscall. Both
+environments are virtual machines, so neither number is a bare-metal figure.
 
 ### How to read it
 

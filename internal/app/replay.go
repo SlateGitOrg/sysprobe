@@ -6,11 +6,11 @@ import (
 	"io"
 	"strings"
 
-	"github.com/archit2501/sysprobe/internal/aggregate"
-	"github.com/archit2501/sysprobe/internal/events"
-	"github.com/archit2501/sysprobe/internal/exporter"
-	"github.com/archit2501/sysprobe/internal/source"
-	"github.com/archit2501/sysprobe/internal/top"
+	"github.com/SlateGitOrg/sysprobe/internal/aggregate"
+	"github.com/SlateGitOrg/sysprobe/internal/events"
+	"github.com/SlateGitOrg/sysprobe/internal/exporter"
+	"github.com/SlateGitOrg/sysprobe/internal/source"
+	"github.com/SlateGitOrg/sysprobe/internal/top"
 )
 
 // ReplayOptions configures Replay.

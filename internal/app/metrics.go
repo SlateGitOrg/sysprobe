@@ -14,7 +14,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/expfmt"
 
-	"github.com/archit2501/sysprobe/internal/exporter"
+	"github.com/SlateGitOrg/sysprobe/internal/exporter"
 )
 
 // Registry builds a registry holding the sysprobe collector and, when self

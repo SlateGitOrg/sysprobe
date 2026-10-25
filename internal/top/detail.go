@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/archit2501/sysprobe/internal/aggregate"
-	"github.com/archit2501/sysprobe/internal/hist"
+	"github.com/SlateGitOrg/sysprobe/internal/aggregate"
+	"github.com/SlateGitOrg/sysprobe/internal/hist"
 )
 
 // RenderProcess draws the per-syscall breakdown of one process, over the

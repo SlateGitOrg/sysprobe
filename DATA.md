@@ -21,6 +21,11 @@ Desktop (Docker Engine 29.8.1) on an arm64 Mac, whose Linux VM runs kernel
 `7.0.14-linuxkit` on aarch64 with 8 vCPUs. The `where` field of the
 `.expect.json` file and the header of the transcript record this.
 
+The CI `integration` job produces the same set of files for the GitHub
+runner's kernel (x86_64) and uploads them as a workflow artifact; they are
+not committed, so the offline tests and `make demo` use the aarch64
+recordings above.
+
 ## What they contain
 
 The probe observes the entire VM, so besides the load generator the

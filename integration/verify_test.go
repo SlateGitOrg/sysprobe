@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/archit2501/sysprobe/internal/aggregate"
-	"github.com/archit2501/sysprobe/internal/fixture"
+	"github.com/SlateGitOrg/sysprobe/internal/aggregate"
+	"github.com/SlateGitOrg/sysprobe/internal/fixture"
 )
 
 // aggregateFixture replays a committed recording through the aggregator,
